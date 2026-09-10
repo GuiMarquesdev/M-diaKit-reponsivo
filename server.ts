@@ -8,10 +8,9 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 
-// Ignore RESEND_API_KEY if platform injected an invalid placeholder
-if (process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.startsWith('re_')) {
-  delete process.env.RESEND_API_KEY;
-}
+// Safely validate RESEND_API_KEY format from environment
+const rawResendKey = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : '';
+const RESEND_API_KEY = rawResendKey.startsWith('re_') ? rawResendKey : '';
 
 const app = express();
 const PORT = 3000;
@@ -292,7 +291,7 @@ async function send2FAEmail(toEmail: string, code: string): Promise<{ success: b
   `;
 
   // 1. Check Resend REST API if configured (Primary choice for Serverless / Vercel deployment)
-  if (process.env.RESEND_API_KEY) {
+  if (RESEND_API_KEY) {
     try {
       // Clean from header: ensure standard ASCII display name and valid format
       const rawFrom = process.env.RESEND_FROM || process.env.SMTP_FROM || '';
@@ -306,7 +305,7 @@ async function send2FAEmail(toEmail: string, code: string): Promise<{ success: b
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
           from: resendFrom,
@@ -336,7 +335,7 @@ async function send2FAEmail(toEmail: string, code: string): Promise<{ success: b
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+                Authorization: `Bearer ${RESEND_API_KEY}`,
               },
               body: JSON.stringify({
                 from: resendFrom,
