@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper authorization functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'sophiaamenezes10@gmail.com' ||
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid))
+      );
+    }
+
+    // Media Kit public content: readable by everyone, editable ONLY by authenticated admins
+    match /content/mediaKit {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Commercial leads: public submission with validation, read/manage ONLY by authenticated admins
+    match /leads/{leadId} {
+      allow create: if request.resource.data.email is string 
+                    && request.resource.data.name is string
+                    && request.resource.data.email.size() >= 5
+                    && request.resource.data.email.size() <= 120
+                    && request.resource.data.name.size() >= 2
+                    && request.resource.data.name.size() <= 100;
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Admin list: read only by authenticated users, write only by admins
+    match /adminUsers/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Explicit deny for any other document/collection
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

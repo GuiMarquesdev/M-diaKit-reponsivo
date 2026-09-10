@@ -1,0 +1,6 @@
+{
+  "name": "Mídia Kit - Sophia Menezes",
+  "description": "Mídia Kit digital e interativo de Sophia Menezes — criadora de conteúdo de moda feminina, beleza, cachos, fitness e lifestyle.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
