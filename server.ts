@@ -839,6 +839,8 @@ app.post('/api/upload/validate', authenticateSession, (req, res) => {
 
 // ==========================================
 // 9. VITE MIDDLEWARE & STATIC SERVING
+// (apenas para execucao local/tradicional; na Vercel os assets estaticos
+// sao servidos pelo CDN e este app roda como funcao serverless via api/index.ts)
 // ==========================================
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -860,4 +862,11 @@ async function startServer() {
   });
 }
 
-startServer();
+// Na Vercel (process.env.VERCEL esta sempre definido em funcoes serverless),
+// nao chamamos app.listen() nem servimos estatico por aqui - a plataforma
+// invoca o `app` exportado abaixo diretamente a cada requisicao de /api/*.
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
