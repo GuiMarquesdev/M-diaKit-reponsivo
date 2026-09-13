@@ -6,7 +6,6 @@ import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
-import { createServer as createViteServer } from 'vite';
 
 // Safely validate RESEND_API_KEY format from environment
 const rawResendKey = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : '';
@@ -844,6 +843,7 @@ app.post('/api/upload/validate', authenticateSession, (req, res) => {
 // ==========================================
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
