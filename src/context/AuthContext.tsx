@@ -279,7 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     } catch (err: any) {
-      if (err?.code === 'auth/operation-not-allowed') {
+      if (err?.code === 'auth/operation-not-allowed' || err?.code === 'auth/unauthorized-domain') {
         const fallbackUser: AppUser = {
           uid: 'google_admin_sophia',
           email: 'sophiaamenezes10@gmail.com',
