@@ -89,34 +89,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Session parse error', e);
       }
 
-      // 2. Check server HttpOnly cookie session if available
-      try {
-        const res = await fetch('/api/auth/session', {
-          credentials: 'include',
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (res.ok) {
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const data = await res.json();
-            if (data.authenticated && data.user && isMounted) {
-              const u: AppUser = {
-                uid: data.user.userId,
-                email: data.user.email,
-                displayName: data.user.displayName,
-                role: data.user.role || 'ADMIN',
-                twoFactorEnabled: true,
-                permissions: data.user.permissions || ['EDIT_CONTENT', 'MANAGE_BRANDS'],
-              };
-              setUser(u);
-              localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-              setLoading(false);
-              return;
+      // 2. Only check server session if user is on an admin/login route
+      const isAdminPath = typeof window !== 'undefined' && (
+        window.location.pathname.includes('admin') ||
+        window.location.pathname.includes('login')
+      );
+
+      if (isAdminPath) {
+        try {
+          const res = await fetch('/api/auth/session', {
+            credentials: 'include',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          if (res.ok) {
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              const data = await res.json();
+              if (data.authenticated && data.user && isMounted) {
+                const u: AppUser = {
+                  uid: data.user.userId,
+                  email: data.user.email,
+                  displayName: data.user.displayName,
+                  role: data.user.role || 'ADMIN',
+                  twoFactorEnabled: true,
+                  permissions: data.user.permissions || ['EDIT_CONTENT', 'MANAGE_BRANDS'],
+                };
+                setUser(u);
+                localStorage.setItem('sophia_admin_session', JSON.stringify(u));
+                setLoading(false);
+                return;
+              }
             }
           }
+        } catch {
+          // Continue to check Firebase silently without throwing
         }
-      } catch {
-        // Continue to check Firebase
       }
 
       // 3. Check client Firebase Auth

@@ -44,6 +44,7 @@ app.use(
       const isAllowed =
         allowedOrigins.includes(origin) ||
         origin.endsWith('.run.app') ||
+        origin.endsWith('.vercel.app') ||
         origin.endsWith('.localhost');
       if (isAllowed) {
         callback(null, true);
@@ -122,7 +123,7 @@ const leadsRateLimiter = createRateLimiter({
 });
 
 // Clean up stale rate limits every 10 minutes
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of rateLimitStore.entries()) {
     if (now > record.resetTime) {
@@ -130,6 +131,9 @@ setInterval(() => {
     }
   }
 }, 10 * 60 * 1000);
+if (cleanupTimer && typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 // ==========================================
 // 4. PASSWORD HASHING (Faça Hash das senhas)
@@ -488,7 +492,7 @@ function isValidEmail(email: string): boolean {
 // ==========================================
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -508,7 +512,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // LOGIN STEP 1: Email + Password Verification (Hash check + 2FA generation & email delivery)
-app.post('/api/auth/login', authRateLimiter, async (req, res) => {
+app.post(['/api/auth/login', '/auth/login'], authRateLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   // Server-Side Validation
@@ -568,7 +572,7 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
 });
 
 // GET CURRENT 2FA CODE: For preview environments without active SMTP transporter
-app.get('/api/auth/2fa-code/:challengeId', (req, res) => {
+app.get(['/api/auth/2fa-code/:challengeId', '/auth/2fa-code/:challengeId'], (req, res) => {
   const { challengeId } = req.params;
   if (!challengeId || typeof challengeId !== 'string') {
     return res.status(400).json({ error: 'ID de desafio inválido.' });
@@ -585,7 +589,7 @@ app.get('/api/auth/2fa-code/:challengeId', (req, res) => {
 });
 
 // RESEND 2FA: Resends a new verification code to registered email
-app.post('/api/auth/resend-2fa', twoFaRateLimiter, async (req, res) => {
+app.post(['/api/auth/resend-2fa', '/auth/resend-2fa'], twoFaRateLimiter, async (req, res) => {
   const { challengeId } = req.body;
 
   if (!challengeId || typeof challengeId !== 'string') {
@@ -619,7 +623,7 @@ app.post('/api/auth/resend-2fa', twoFaRateLimiter, async (req, res) => {
 });
 
 // LOGIN STEP 2: Verify 2FA and issue HttpOnly Cookie
-app.post('/api/auth/verify-2fa', twoFaRateLimiter, (req, res) => {
+app.post(['/api/auth/verify-2fa', '/auth/verify-2fa'], twoFaRateLimiter, (req, res) => {
   const { challengeId, code } = req.body;
 
   if (!challengeId || typeof challengeId !== 'string' || !code || typeof code !== 'string') {
@@ -683,7 +687,7 @@ app.post('/api/auth/verify-2fa', twoFaRateLimiter, (req, res) => {
 });
 
 // Check Active Session (HttpOnly cookie verification)
-app.get('/api/auth/session', (req: AuthenticatedRequest, res) => {
+app.get(['/api/auth/session', '/auth/session'], (req: AuthenticatedRequest, res) => {
   const token = req.cookies[SESSION_COOKIE_NAME];
   if (!token) {
     return res.json({ authenticated: false, user: null });
@@ -709,7 +713,7 @@ app.get('/api/auth/session', (req: AuthenticatedRequest, res) => {
 });
 
 // LOGOUT: Clears HttpOnly Cookie
-app.post('/api/auth/logout', (req, res) => {
+app.post(['/api/auth/logout', '/auth/logout'], (req, res) => {
   res.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -720,7 +724,7 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // COMMERCIAL LEADS SUBMISSION: Server-Side Validation + Rate Limit
-app.post('/api/leads', leadsRateLimiter, (req, res) => {
+app.post(['/api/leads', '/leads'], leadsRateLimiter, (req, res) => {
   const { name, email, brand, budget, message } = req.body;
 
   // 1. Validação Server-Side rigorosa
@@ -761,7 +765,7 @@ app.post('/api/leads', leadsRateLimiter, (req, res) => {
 });
 
 // UPLOAD VALIDATION (Valide uploads)
-app.post('/api/upload/validate', authenticateSession, (req, res) => {
+app.post(['/api/upload/validate', '/upload/validate'], authenticateSession, (req, res) => {
   const { fileData, fileName, fileType, purpose } = req.body;
 
   if (!fileData || typeof fileData !== 'string') {
@@ -836,6 +840,11 @@ app.post('/api/upload/validate', authenticateSession, (req, res) => {
   });
 });
 
+// Fallback para qualquer rota de API não encontrada (evita timeout/500 na Vercel)
+app.use(['/api', '/api/*'], (req, res) => {
+  res.status(404).json({ error: 'Endpoint de API não encontrado.' });
+});
+
 // ==========================================
 // 9. VITE MIDDLEWARE & STATIC SERVING
 // (apenas para execucao local/tradicional; na Vercel os assets estaticos
@@ -862,10 +871,14 @@ async function startServer() {
   });
 }
 
-// Na Vercel (process.env.VERCEL esta sempre definido em funcoes serverless),
-// nao chamamos app.listen() nem servimos estatico por aqui - a plataforma
-// invoca o `app` exportado abaixo diretamente a cada requisicao de /api/*.
-if (!process.env.VERCEL) {
+// Na Vercel ou quando importado como módulo, não executamos o listen nem estáticos
+const isMain = typeof process !== 'undefined' && process.argv[1] && (
+  process.argv[1].endsWith('server.ts') ||
+  process.argv[1].endsWith('server.cjs') ||
+  process.argv[1].endsWith('server.js')
+);
+
+if (isMain && !process.env.VERCEL && !process.env.VERCEL_ENV) {
   startServer();
 }
 
