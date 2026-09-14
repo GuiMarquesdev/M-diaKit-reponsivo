@@ -194,7 +194,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setFilterTab('all')}
@@ -215,7 +215,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
               : 'bg-white text-[#7B4B2A] border border-[#7B4B2A]/20 hover:bg-[#FAF7F2]'
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
           <span>Atualmente Trabalha ({brands.filter((b) => b.status === 'active').length})</span>
         </button>
         <button
@@ -227,7 +227,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
               : 'bg-white text-[#7B4B2A] border border-[#7B4B2A]/20 hover:bg-[#FAF7F2]'
           }`}
         >
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#B8860B]" />
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#B8860B] shrink-0" />
           <span>Já Trabalhou ({brands.filter((b) => b.status === 'past').length})</span>
         </button>
       </div>
@@ -364,7 +364,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
                         <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">
                           Status da Parceria *
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => handleUpdateBrand(brand.id, { status: 'active' })}

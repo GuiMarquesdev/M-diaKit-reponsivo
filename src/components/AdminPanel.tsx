@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Save,
@@ -22,6 +22,9 @@ import {
   Lock,
   Mail,
   Layers,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { MediaKitData, SegmentItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +43,26 @@ interface AdminPanelProps {
 }
 
 type TabType = 'creator' | 'metrics' | 'instagram' | 'tiktok' | 'segments' | 'photos' | 'brands' | 'formats' | 'contact';
+
+interface TabItem {
+  id: TabType;
+  label: string;
+  shortLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description?: string;
+}
+
+const TABS: TabItem[] = [
+  { id: 'creator', label: 'Perfil & Bio', shortLabel: 'Perfil', icon: User, description: 'Nome, bio e apresentação' },
+  { id: 'photos', label: 'Gerenciador de Fotos', shortLabel: 'Fotos', icon: ImageIcon, description: 'Upload e enquadramento de fotos' },
+  { id: 'metrics', label: 'Métricas Globais', shortLabel: 'Métricas', icon: TrendingUp, description: 'Alcance, engajamento e impressões' },
+  { id: 'instagram', label: 'Instagram & Demografia', shortLabel: 'Instagram', icon: Instagram, description: 'Seguidores, demografia e reels' },
+  { id: 'tiktok', label: 'TikTok & Viral', shortLabel: 'TikTok', icon: TrendingUp, description: 'Curtidas, views e recordes' },
+  { id: 'segments', label: 'Pilares Editoriais', shortLabel: 'Pilares', icon: FileText, description: 'Nichos e categorias de conteúdo' },
+  { id: 'brands', label: 'Marcas & Parcerias', shortLabel: 'Marcas', icon: Briefcase, description: 'Marcas atuais e histórico' },
+  { id: 'formats', label: 'Formatos de Parceria', shortLabel: 'Formatos', icon: Layers, description: 'Entregas e formatos comerciais' },
+  { id: 'contact', label: 'Contato Comercial', shortLabel: 'Contato', icon: Mail, description: 'Email, WhatsApp e assessoria' },
+];
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   isOpen = true,
@@ -117,6 +140,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   React.useEffect(() => {
     setFormData(data);
   }, [data]);
+
+  // Mobile tabs horizontal scroll reference & active tab helpers
+  const mobileTabsRef = useRef<HTMLDivElement>(null);
+  const activeIndex = Math.max(0, TABS.findIndex((t) => t.id === activeTab));
+  const activeTabItem = TABS[activeIndex] || TABS[0];
+  const ActiveIcon = activeTabItem.icon;
+
+  // Auto-scroll active mobile tab chip into view
+  useEffect(() => {
+    if (mobileTabsRef.current) {
+      const activeEl = mobileTabsRef.current.querySelector<HTMLElement>(`[data-tab-id="${activeTab}"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeTab]);
 
   if (!isOpen) return null;
 
@@ -212,36 +251,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     <div
       className={
         isPage
-          ? 'min-h-screen bg-[#F5EFE9] text-[#2C1810] flex flex-col p-3 sm:p-6 md:p-8'
-          : 'fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md animate-fadeIn'
+          ? 'min-h-screen bg-[#F5EFE9] text-[#2C1810] flex flex-col p-2 sm:p-5 md:p-8'
+          : 'fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-md animate-fadeIn'
       }
     >
       <div
         className={
           isPage
-            ? 'bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-3xl w-full max-w-6xl mx-auto shadow-xl flex flex-col flex-1 overflow-hidden text-[#2C1810] min-h-[88vh]'
-            : 'bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-3xl w-full max-w-5xl h-[90vh] max-h-[850px] shadow-2xl flex flex-col overflow-hidden text-[#2C1810]'
+            ? 'bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-2xl sm:rounded-3xl w-full max-w-6xl mx-auto shadow-xl flex flex-col flex-1 overflow-hidden text-[#2C1810] min-h-[88vh]'
+            : 'bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-2xl sm:rounded-3xl w-full max-w-5xl h-[92vh] max-h-[850px] shadow-2xl flex flex-col overflow-hidden text-[#2C1810]'
         }
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[#7B4B2A]/15 bg-[#F5EFE9] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-serif text-lg font-bold text-[#2C1810]">
-                  Painel Administrativo do Mídia Kit
-                </h2>
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#2C1810]">
-                  <Shield className="w-3 h-3 text-[#B8860B]" /> Área Restrita
-                </span>
-              </div>
-              <p className="text-xs text-[#7B4B2A]">
-                {user ? `Conectado como: ${user.email || 'Admin'}` : 'Acesso restrito para edição'}
-              </p>
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#7B4B2A]/15 bg-[#F5EFE9] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-serif text-base sm:text-lg font-bold text-[#2C1810] tracking-tight">
+                Painel Administrativo do Mídia Kit
+              </h2>
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#2C1810] shrink-0 border border-[#D4AF37]/40">
+                <Shield className="w-3 h-3 text-[#B8860B]" /> Área Restrita
+              </span>
             </div>
+            <p className="text-xs text-[#7B4B2A] truncate">
+              {user ? `Conectado como: ${user.email || 'Admin'}` : 'Acesso restrito para edição'}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
             {onClose && (
               <button
                 type="button"
@@ -250,7 +287,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 title="Voltar ao Mídia Kit Público"
               >
                 <ArrowLeft className="w-3.5 h-3.5 text-[#B8860B]" />
-                <span className="hidden sm:inline">Voltar ao Mídia Kit</span>
+                <span>Voltar ao Mídia Kit</span>
               </button>
             )}
 
@@ -258,11 +295,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <button
                 type="button"
                 onClick={logout}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#7B4B2A] hover:text-[#C53030] hover:bg-white/60 rounded-lg transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#7B4B2A] hover:text-[#C53030] bg-white sm:bg-transparent hover:bg-red-50 sm:hover:bg-white/60 border border-[#7B4B2A]/15 sm:border-transparent rounded-xl transition-colors cursor-pointer"
                 title="Desconectar"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sair</span>
+                <span>Sair</span>
               </button>
             )}
 
@@ -493,130 +530,119 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         ) : (
           /* Logged In: Full CMS Admin Interface */
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
             
-            {/* Sidebar Navigation */}
-            <div className="w-full md:w-56 bg-[#F5EFE9] border-r border-[#7B4B2A]/15 p-3 flex md:flex-col gap-1.5 overflow-x-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveTab('creator')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'creator'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                <span>Perfil & Bio</span>
-              </button>
+            {/* Navigation: Responsive Switcher for Mobile (< md) */}
+            <div className="md:hidden bg-[#F5EFE9] border-b border-[#7B4B2A]/15 p-2.5 flex flex-col gap-2 shrink-0">
+              {/* Header row with Section Counter & Prev/Next buttons */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-[#7B4B2A] uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#B8860B]" />
+                  Seção {activeIndex + 1} de {TABS.length}: <span className="text-[#2C1810]">{activeTabItem.shortLabel}</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={activeIndex === 0}
+                    onClick={() => setActiveTab(TABS[activeIndex - 1].id)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-[#FAF7F2] border border-[#7B4B2A]/20 rounded-lg text-xs font-semibold text-[#4A2E1F] disabled:opacity-30 cursor-pointer shadow-2xs transition-all"
+                    title="Seção anterior"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Anterior</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={activeIndex === TABS.length - 1}
+                    onClick={() => setActiveTab(TABS[activeIndex + 1].id)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-[#FAF7F2] border border-[#7B4B2A]/20 rounded-lg text-xs font-semibold text-[#4A2E1F] disabled:opacity-30 cursor-pointer shadow-2xs transition-all"
+                    title="Próxima seção"
+                  >
+                    <span>Próxima</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('photos')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'photos'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <ImageIcon className="w-4 h-4" />
-                <span>Gerenciador de Fotos</span>
-              </button>
+              {/* Native Dropdown for 1-tap jump on mobile */}
+              <div className="relative">
+                <select
+                  value={activeTab}
+                  onChange={(e) => setActiveTab(e.target.value as TabType)}
+                  className="w-full appearance-none bg-white border border-[#D4AF37]/60 text-[#2C1810] font-bold text-xs py-2 pl-9 pr-8 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] cursor-pointer"
+                >
+                  {TABS.map((tab, idx) => (
+                    <option key={tab.id} value={tab.id}>
+                      {idx + 1}. {tab.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#B8860B]">
+                  <ActiveIcon className="w-4 h-4" />
+                </div>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#7B4B2A]">
+                  <ChevronDown className="w-4 h-4" />
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('metrics')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'metrics'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
+              {/* Horizontal Scrollable Pills Strip */}
+              <div
+                ref={mobileTabsRef}
+                className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth"
               >
-                <TrendingUp className="w-4 h-4" />
-                <span>Métricas Globais</span>
-              </button>
+                {TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      data-tab-id={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm ring-1 ring-[#D4AF37]/60'
+                          : 'bg-white/80 text-[#7B4B2A] border border-[#7B4B2A]/15 hover:bg-white'
+                      }`}
+                    >
+                      <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{tab.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('instagram')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'instagram'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <Instagram className="w-4 h-4" />
-                <span>Instagram & Demografia</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('tiktok')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'tiktok'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span>TikTok & Viral</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('segments')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'segments'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>Pilares Editoriais</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('brands')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'brands'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <Briefcase className="w-4 h-4" />
-                <span>Marcas & Parcerias</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('formats')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'formats'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>Formatos de Parceria</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('contact')}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap ${
-                  activeTab === 'contact'
-                    ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm'
-                    : 'text-[#7B4B2A] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                <span>Contato Comercial</span>
-              </button>
+            {/* Desktop Sidebar Navigation (>= md) */}
+            <div className="hidden md:flex md:flex-col w-56 lg:w-60 bg-[#F5EFE9] border-r border-[#7B4B2A]/15 p-3 gap-1.5 shrink-0 overflow-y-auto">
+              <div className="pb-2 mb-1 border-b border-[#7B4B2A]/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B4B2A] px-2">
+                  Seções do Mídia Kit ({TABS.length})
+                </span>
+              </div>
+              {TABS.map((tab) => {
+                const TabIcon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                      isActive
+                        ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm ring-1 ring-[#D4AF37]/40 font-bold'
+                        : 'text-[#7B4B2A] hover:bg-[#FAF7F2] hover:text-[#2C1810]'
+                    }`}
+                  >
+                    <TabIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#D4AF37]' : 'text-[#7B4B2A]'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Form Fields Body */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-6">
+            <div className="flex-1 p-3.5 sm:p-6 overflow-y-auto space-y-6 min-w-0">
               
               {/* Tab 1: Creator / Profile */}
               {activeTab === 'creator' && (
@@ -1299,8 +1325,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {/* Footer actions when logged in */}
         {user && (
-          <div className="px-6 py-4 border-t border-[#7B4B2A]/15 bg-[#F5EFE9] flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-[#7B4B2A]/15 bg-[#F5EFE9] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={async () => {
@@ -1310,43 +1336,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     setTimeout(() => setSavedSuccess(false), 3000);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[#7B4B2A] hover:bg-white/60 rounded-xl transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#7B4B2A] hover:bg-white/60 border border-[#7B4B2A]/20 rounded-xl transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Restaurar Padrão</span>
               </button>
 
               {savedSuccess && (
-                <div className="inline-flex items-center gap-1.5 text-xs text-green-700 font-semibold animate-fadeIn">
-                  <CheckCircle2 className="w-4 h-4" />
+                <div className="inline-flex items-center gap-1.5 text-xs text-green-700 font-semibold animate-fadeIn bg-green-50 px-2.5 py-1 rounded-lg border border-green-200">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>Publicado na nuvem com sucesso!</span>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="inline-flex items-center gap-1.5 text-xs text-red-600 font-semibold animate-fadeIn">
-                  <AlertCircle className="w-4 h-4" />
+                <div className="inline-flex items-center gap-1.5 text-xs text-red-600 font-semibold animate-fadeIn bg-red-50 px-2.5 py-1 rounded-lg border border-red-200">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMessage}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 sm:flex-none px-4 py-2 text-xs text-[#4A2E1F] hover:bg-white/60 rounded-xl font-medium transition-colors"
-              >
-                Cancelar
-              </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 sm:flex-none px-4 py-2 text-xs text-[#4A2E1F] hover:bg-white/60 border border-[#7B4B2A]/20 rounded-xl font-medium transition-colors text-center cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-[#4A2E1F] hover:bg-[#2C1810] text-[#FAF7F2] rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 bg-[#4A2E1F] hover:bg-[#2C1810] text-[#FAF7F2] rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50 cursor-pointer"
               >
-                <Save className="w-4 h-4 text-[#D4AF37]" />
+                <Save className="w-4 h-4 text-[#D4AF37] shrink-0" />
                 <span>{saving ? 'Publicando...' : 'Salvar Alterações na Nuvem'}</span>
               </button>
             </div>

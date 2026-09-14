@@ -150,7 +150,7 @@ export const AdminPartnershipFormatsEditor: React.FC<AdminPartnershipFormatsEdit
           onSubmit={handleAddFormat}
           className="p-5 bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-2xl space-y-4 animate-fadeIn shadow-xs"
         >
-          <div className="flex items-center justify-between border-b border-[#7B4B2A]/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-[#7B4B2A]/10 pb-2">
             <span className="text-xs uppercase tracking-wider font-bold text-[#4A2E1F] flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-[#B8860B]" />
               Cadastrar Novo Formato de Parceria
