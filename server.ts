@@ -161,8 +161,8 @@ const ADMIN_EMAILS: string[] = [
   ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL.toLowerCase().trim()] : []),
 ];
 const ADMIN_SALT = 'e9f1a283b4c5d6e7f809123456789abc';
-// Hash of "Euevoce10@" using scrypt with ADMIN_SALT
-const ADMIN_HASHED_PASSWORD = hashPassword('Euevoce10@', ADMIN_SALT);
+// Hash of "Sophia@M10" using scrypt with ADMIN_SALT
+const ADMIN_HASHED_PASSWORD = hashPassword('Sophia@M10', ADMIN_SALT);
 
 // User roles and permissions (Controle de Permissão / RBAC)
 export type UserRole = 'ADMIN' | 'EDITOR' | 'VIEWER';
@@ -532,7 +532,7 @@ app.post(['/api/auth/login', '/auth/login'], authRateLimiter, async (req, res) =
     : false;
 
   // Fallback check for initial admin setup if password equals the established credential
-  const isCredentialAccepted = isPasswordValid || (isAuthorizedAdmin && password === 'Euevoce10@');
+  const isCredentialAccepted = isPasswordValid || (isAuthorizedAdmin && password === 'Sophia@M10');
 
   if (!isCredentialAccepted) {
     return res.status(401).json({ error: 'Credenciais inválidas. Verifique seu e-mail e senha.' });

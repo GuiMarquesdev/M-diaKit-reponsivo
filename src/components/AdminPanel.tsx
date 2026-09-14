@@ -92,7 +92,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Auth form states
   const [emailInput, setEmailInput] = useState('sophiaamenezes10@gmail.com');
-  const [passwordInput, setPasswordInput] = useState('Euevoce10@');
+  const [passwordInput, setPasswordInput] = useState('Sophia@M10');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);

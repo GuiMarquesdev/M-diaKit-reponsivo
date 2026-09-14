@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cleanEmail === 'guimarquesbrito@gmail.com';
 
     // 1. Direct validation for Master Admin credentials (Instant, 100% resilient on Vercel)
-    if (isMasterAdminEmail && (pass === 'Euevoce10@' || pass.length >= 6)) {
+    if (isMasterAdminEmail && pass === 'Sophia@M10') {
       const adminUser: AppUser = {
         uid: cleanEmail === 'guimarquesbrito@gmail.com' ? 'admin_guilherme' : 'admin_sophia',
         email: cleanEmail,
