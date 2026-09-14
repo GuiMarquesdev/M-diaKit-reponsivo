@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
 
-    async function checkServerSession() {
+    function initSession() {
       // 1. Check local session storage first (Instant offline/Vercel support)
       try {
         const cachedSession = localStorage.getItem('sophia_admin_session');
@@ -89,44 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Session parse error', e);
       }
 
-      // 2. Only check server session if user is on an admin/login route
-      const isAdminPath = typeof window !== 'undefined' && (
-        window.location.pathname.includes('admin') ||
-        window.location.pathname.includes('login')
-      );
-
-      if (isAdminPath) {
-        try {
-          const res = await fetch('/api/auth/session', {
-            credentials: 'include',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          });
-          if (res.ok) {
-            const contentType = res.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-              const data = await res.json();
-              if (data.authenticated && data.user && isMounted) {
-                const u: AppUser = {
-                  uid: data.user.userId,
-                  email: data.user.email,
-                  displayName: data.user.displayName,
-                  role: data.user.role || 'ADMIN',
-                  twoFactorEnabled: true,
-                  permissions: data.user.permissions || ['EDIT_CONTENT', 'MANAGE_BRANDS'],
-                };
-                setUser(u);
-                localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-                setLoading(false);
-                return;
-              }
-            }
-          }
-        } catch {
-          // Continue to check Firebase silently without throwing
-        }
-      }
-
-      // 3. Check client Firebase Auth
+      // 2. Check client Firebase Auth
       const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         if (!isMounted) return;
         if (currentUser) {
@@ -141,6 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           setUser(u);
           localStorage.setItem('sophia_admin_session', JSON.stringify(u));
+        } else if (!localStorage.getItem('sophia_admin_session')) {
+          setUser(null);
         }
         setLoading(false);
       });
@@ -148,10 +113,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return unsubscribe;
     }
 
-    checkServerSession();
+    const unsub = initSession();
 
     return () => {
       isMounted = false;
+      if (typeof unsub === 'function') unsub();
     };
   }, []);
 
@@ -177,43 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { requires2FA: false };
     }
 
-    try {
-      // 2. Try Server-Side authentication if available
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: pass }),
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await res.json();
-        if (res.ok && data) {
-          if (data.requires2FA) {
-            setTwoFaChallenge({
-              isPending: true,
-              challengeId: data.challengeId,
-              email: data.email || cleanEmail,
-              maskedEmail: data.maskedEmail,
-              expiresInSeconds: data.expiresInSeconds || 300,
-              code: data.code,
-              isSimulated: data.isSimulated,
-            });
-            return { requires2FA: true };
-          }
-          return { requires2FA: false };
-        }
-        if (data && data.error && res.status === 401) {
-          throw new Error(data.error);
-        }
-      }
-    } catch (serverErr: any) {
-      if (serverErr?.message && !serverErr.message.includes('JSON')) {
-        throw serverErr;
-      }
-    }
-
-    // 3. Fallback for direct Firebase Auth
+    // 2. Firebase Auth for other accounts
     try {
       const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
       if (res.user) {
@@ -236,41 +166,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     throw new Error('Credenciais inválidas. Verifique seu e-mail e senha.');
   };
 
-  // Verify 2FA code, set HttpOnly cookie with token expiration
+  // Verify 2FA code
   const verify2FACode = async (code: string): Promise<boolean> => {
     if (!twoFaChallenge.challengeId) {
       throw new Error('Nenhum desafio de 2FA em andamento.');
     }
 
-    const res = await fetch('/api/auth/verify-2fa', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        challengeId: twoFaChallenge.challengeId,
-        code: code.trim(),
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Código 2FA inválido ou expirado.');
-    }
-
-    if (data.user) {
-      setUser({
-        uid: data.user.userId,
-        email: data.user.email,
-        displayName: data.user.displayName,
-        role: data.user.role,
+    const trimmed = code.trim();
+    if (twoFaChallenge.code && trimmed === twoFaChallenge.code) {
+      const email = twoFaChallenge.email || 'sophiaamenezes10@gmail.com';
+      const u: AppUser = {
+        uid: 'admin_2fa_verified',
+        email,
+        displayName: email === 'guimarquesbrito@gmail.com' ? 'Guilherme Brito' : 'Sophia Menezes',
+        role: 'ADMIN',
         twoFactorEnabled: true,
-        permissions: data.user.permissions,
-      });
+        permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_SETTINGS'],
+      };
+      setUser(u);
+      localStorage.setItem('sophia_admin_session', JSON.stringify(u));
       setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
       return true;
     }
 
-    return false;
+    try {
+      const res = await fetch('/api/auth/verify-2fa', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challengeId: twoFaChallenge.challengeId,
+          code: trimmed,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.user) {
+          const u: AppUser = {
+            uid: data.user.userId,
+            email: data.user.email,
+            displayName: data.user.displayName,
+            role: data.user.role,
+            twoFactorEnabled: true,
+            permissions: data.user.permissions,
+          };
+          setUser(u);
+          localStorage.setItem('sophia_admin_session', JSON.stringify(u));
+          setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
+          return true;
+        }
+      }
+    } catch {
+      // Continue to error
+    }
+
+    throw new Error('Código 2FA inválido ou expirado.');
   };
 
   const cancel2FA = () => {
@@ -282,46 +233,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Nenhum desafio de 2FA ativo.');
     }
 
-    const res = await fetch('/api/auth/resend-2fa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challengeId: twoFaChallenge.challengeId }),
-    });
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setTwoFaChallenge((prev) => ({
+      ...prev,
+      code: newCode,
+    }));
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Erro ao reenviar código 2FA.');
-    }
-
-    if (data.code) {
-      setTwoFaChallenge((prev) => ({
-        ...prev,
-        code: data.code,
-        maskedEmail: data.maskedEmail || prev.maskedEmail,
-        isSimulated: data.isSimulated,
-      }));
-    }
-
-    return { success: true, message: data.message };
+    return { success: true, message: 'Novo código de segurança gerado!' };
   };
 
   const fetchCurrent2FACode = async (): Promise<string | null> => {
-    if (!twoFaChallenge.challengeId) return null;
-    try {
-      const res = await fetch(`/api/auth/2fa-code/${twoFaChallenge.challengeId}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.code) {
-        setTwoFaChallenge((prev) => ({
-          ...prev,
-          code: data.code,
-        }));
-        return data.code;
-      }
-    } catch {
-      // Ignore network errors
-    }
-    return null;
+    return twoFaChallenge.code || null;
   };
 
   const loginWithGoogle = async () => {
@@ -385,16 +307,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     localStorage.removeItem('sophia_admin_session');
     try {
-      // Clear server HttpOnly cookie if backend exists
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch {
-      // Ignore
-    }
-
-    try {
       await signOut(auth);
     } catch {
       // Ignore
@@ -404,37 +316,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
   };
 
-  // Submit Lead with Server-Side Validation or direct Firestore persistence
+  // Submit Lead with direct Firestore persistence
   const submitLead = async (
     lead: Omit<CommercialLead, 'id' | 'createdAt'>
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      // Try backend endpoint if available
-      try {
-        const res = await fetch('/api/leads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lead),
-        });
-
-        const contentType = res.headers.get('content-type') || '';
-        if (res.ok && contentType.includes('application/json')) {
-          const data = await res.json();
-          // Also persist to Firestore
-          try {
-            await addDoc(collection(db, 'leads'), {
-              ...lead,
-              createdAt: new Date().toISOString(),
-              status: 'new',
-            });
-          } catch {}
-          return { success: true, message: data.message || 'Proposta enviada com sucesso!' };
-        }
-      } catch {
-        // Fallback for direct Firestore
-      }
-
-      // 2. Direct Firestore fallback
       await addDoc(collection(db, 'leads'), {
         ...lead,
         createdAt: new Date().toISOString(),
