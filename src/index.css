@@ -51,3 +51,91 @@
   background-size: 24px 24px;
 }
 
+/* =========================================================================
+   SYNCHRONIZED METRICS ANIMATIONS (2.8s Unified Tempo)
+   ========================================================================= */
+
+/* 1. Alcance Mensal - Upward boost synchronized with heart and eye */
+@keyframes syncUpwardBoost {
+  0%, 22%, 78%, 100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  28% {
+    transform: translateY(1px) scale(0.98);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  48% {
+    transform: translateY(-7px) scale(1.15);
+    filter: drop-shadow(0 6px 12px rgba(212, 175, 55, 0.5));
+  }
+  64% {
+    transform: translateY(-2px) scale(1.05);
+    filter: drop-shadow(0 3px 6px rgba(212, 175, 55, 0.25));
+  }
+}
+
+.animate-trending-up {
+  animation: syncUpwardBoost 2.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  transform-origin: center bottom;
+  will-change: transform, filter;
+}
+
+/* 2. Engajamento Total - Heart pulse synchronized to the same 2.8s tempo */
+@keyframes syncHeartbeat {
+  0%, 22%, 75%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  35% {
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.5));
+  }
+  43% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0.25));
+  }
+  52% {
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.45));
+  }
+}
+
+.animate-heartbeat {
+  animation: syncHeartbeat 2.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+  will-change: transform, filter;
+}
+
+/* 3. Impressões Mensais - Eye blink synchronized to the same 2.8s tempo */
+@keyframes syncEyeBlink {
+  0%, 25%, 72%, 100% {
+    transform: scaleY(1);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  38% {
+    transform: scaleY(0.08);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  48% {
+    transform: scaleY(1.08);
+    filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.5));
+  }
+  56% {
+    transform: scaleY(0.12);
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  64% {
+    transform: scaleY(1);
+    filter: drop-shadow(0 0 4px rgba(212, 175, 55, 0.25));
+  }
+}
+
+.animate-eye-blink {
+  animation: syncEyeBlink 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  transform-origin: center;
+  will-change: transform, filter;
+}
+
+
+

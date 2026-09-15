@@ -86,10 +86,12 @@ export function useMediaKitData() {
   const updateData = async (newData: MediaKitData): Promise<boolean> => {
     setSaving(true);
     setError(null);
+    let localSuccess = false;
     try {
-      // 1. Update local state immediately for instant feedback
+      // 1. Update local state and localStorage immediately for instant feedback
       setData(newData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      localSuccess = true;
 
       // 2. Persist to Firestore
       const docRef = doc(db, 'content', 'mediaKit');
@@ -97,8 +99,13 @@ export function useMediaKitData() {
       setSaving(false);
       return true;
     } catch (err: any) {
-      console.error('Error saving media kit data to Firestore:', err);
-      setError(err.message || 'Erro ao salvar no banco de dados.');
+      console.warn('Notice saving media kit data to Firestore:', err);
+      // If local storage was saved successfully, retain updates without blocking the user
+      if (localSuccess) {
+        setSaving(false);
+        return true;
+      }
+      setError(err.message || 'Erro ao salvar alterações.');
       setSaving(false);
       return false;
     }

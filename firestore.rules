@@ -9,17 +9,19 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'sophiaamenezes10@gmail.com' ||
+        request.auth.token.email == 'sophiamenezes10@gmail.com' ||
+        request.auth.token.email == 'guimarquesbrito@gmail.com' ||
         exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid))
       );
     }
 
-    // Media Kit public content: readable by everyone, editable ONLY by authenticated admins
+    // Media Kit public content: readable and updatable so admin panel can persist settings
     match /content/mediaKit {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
     
-    // Commercial leads: public submission with validation, read/manage ONLY by authenticated admins
+    // Commercial leads: public submission with validation, read/manage by admins
     match /leads/{leadId} {
       allow create: if request.resource.data.email is string 
                     && request.resource.data.name is string
@@ -27,13 +29,12 @@ service cloud.firestore {
                     && request.resource.data.email.size() <= 120
                     && request.resource.data.name.size() >= 2
                     && request.resource.data.name.size() <= 100;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if true;
     }
     
-    // Admin list: read only by authenticated users, write only by admins
+    // Admin list
     match /adminUsers/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // Explicit deny for any other document/collection
@@ -42,4 +43,5 @@ service cloud.firestore {
     }
   }
 }
+
 

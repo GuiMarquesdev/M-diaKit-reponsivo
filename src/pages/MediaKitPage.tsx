@@ -67,18 +67,30 @@ export const MediaKitPage: React.FC = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        // Shortcut Ctrl+Shift+A or Cmd+Shift+A to navigate to Secret Admin Route
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-          e.preventDefault();
-          navigate('/admin789459');
-        }
-      };
+    if (typeof window === 'undefined') return;
 
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+    // Atalho restrito estritamente à fase de desenvolvimento (localhost, 127.0.0.1 ou AI Studio Dev)
+    // Em fase de produção (Vercel, domínio final ou build de produção), o comando é 100% desativado.
+    const isDevelopment =
+      Boolean((import.meta as any).env?.DEV) === true ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('ais-dev-');
+
+    if (!isDevelopment) {
+      return;
     }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Shortcut Ctrl+Shift+A ou Cmd+Shift+A apenas em desenvolvimento
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        navigate('/admin789459');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
 
   // Contact form inputs
@@ -729,7 +741,7 @@ export const MediaKitPage: React.FC = () => {
             
             {/* Metric 1: Alcance */}
             <div className="bg-[#FAF7F2] rounded-3xl p-8 border border-[#D4AF37]/30 text-center relative warm-shadow group hover:border-[#D4AF37] transition-all">
-              <TrendingUp className="w-8 h-8 mx-auto mb-3 text-[#B8860B] group-hover:scale-110 transition-transform" />
+              <TrendingUp className="w-8 h-8 mx-auto mb-3 text-[#B8860B] animate-trending-up" />
               <span className="text-xs uppercase tracking-[0.2em] text-[#7B4B2A] font-semibold block mb-2">
                 Alcance Mensal
               </span>
@@ -743,7 +755,7 @@ export const MediaKitPage: React.FC = () => {
 
             {/* Metric 2: Engajamento */}
             <div className="bg-[#FAF7F2] rounded-3xl p-8 border border-[#D4AF37]/30 text-center relative warm-shadow group hover:border-[#D4AF37] transition-all">
-              <Heart className="w-8 h-8 mx-auto mb-3 text-[#B8860B] group-hover:scale-110 transition-transform" />
+              <Heart className="w-8 h-8 mx-auto mb-3 text-[#B8860B] fill-[#B8860B]/20 animate-heartbeat" />
               <span className="text-xs uppercase tracking-[0.2em] text-[#7B4B2A] font-semibold block mb-2">
                 Engajamento Total
               </span>
@@ -757,7 +769,7 @@ export const MediaKitPage: React.FC = () => {
 
             {/* Metric 3: Impressões */}
             <div className="bg-[#FAF7F2] rounded-3xl p-8 border border-[#D4AF37]/30 text-center relative warm-shadow group hover:border-[#D4AF37] transition-all">
-              <Eye className="w-8 h-8 mx-auto mb-3 text-[#B8860B] group-hover:scale-110 transition-transform" />
+              <Eye className="w-8 h-8 mx-auto mb-3 text-[#B8860B] animate-eye-blink" />
               <span className="text-xs uppercase tracking-[0.2em] text-[#7B4B2A] font-semibold block mb-2">
                 Impressões Mensais
               </span>

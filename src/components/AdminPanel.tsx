@@ -91,8 +91,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Auth form states
-  const [emailInput, setEmailInput] = useState('sophiaamenezes10@gmail.com');
-  const [passwordInput, setPasswordInput] = useState('Sophia@M10');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -440,9 +440,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <input
                       type="email"
                       required
+                      autoComplete="username"
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="sophiaamenezes10@gmail.com"
+                      placeholder="seu.email@exemplo.com"
                       className="w-full px-3 py-2.5 text-xs bg-[#FAF7F2] border border-[#7B4B2A]/25 rounded-xl focus:border-[#D4AF37] focus:outline-none"
                     />
                   </div>
@@ -452,6 +453,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <input
                       type="password"
                       required
+                      autoComplete="current-password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
                       placeholder="••••••••"
