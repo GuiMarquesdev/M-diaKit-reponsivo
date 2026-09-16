@@ -1059,23 +1059,17 @@ export const MediaKitPage: React.FC = () => {
                 Pronta para co-criar campanhas memoráveis com storytelling orgânico, estética sofisticada e alto impacto para o seu público.
               </p>
 
-              {/* CTAs */}
-              <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+              {/* CTA */}
+              <div className="flex items-center justify-center pt-2">
                 
                 {/* Primary Proposal button */}
                 <button
+                  id="closing-cta-proposal-btn"
                   onClick={() => setContactModalOpen(true)}
-                  className="bg-[#4A2E1F] hover:bg-[#7B4B2A] text-[#FAF7F2] text-sm uppercase tracking-widest font-semibold px-7 py-3.5 rounded-full transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer group"
+                  className="bg-[#4A2E1F] hover:bg-[#7B4B2A] text-[#FAF7F2] text-sm uppercase tracking-widest font-semibold px-8 py-4 rounded-full transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer group"
                 >
                   <span>Enviar Proposta Comercial</span>
-                </button>
-
-                {/* Secondary Media Kit Request button */}
-                <button
-                  onClick={() => setContactModalOpen(true)}
-                  className="bg-[#FAF7F2] hover:bg-[#F5EFE9] text-[#4A2E1F] border border-[#7B4B2A]/25 hover:border-[#D4AF37] text-sm uppercase tracking-widest font-semibold px-7 py-3.5 rounded-full transition-all duration-300 shadow-xs flex items-center gap-2 cursor-pointer"
-                >
-                  <span>Solicitar Grade & Valores</span>
+                  <ArrowUpRight className="w-4 h-4 text-[#D4AF37] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </button>
 
               </div>
