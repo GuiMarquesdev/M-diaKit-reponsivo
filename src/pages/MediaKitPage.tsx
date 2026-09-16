@@ -22,16 +22,11 @@ import {
 import { useMediaKitData } from '../hooks/useMediaKitData';
 import { useAuth } from '../context/AuthContext';
 import { BrandsSection } from '../components/BrandsSection';
+import { OFFICIAL_SOCIAL_LINKS } from '../constants';
+import { TikTokIcon } from '../components/SocialIcons';
 
 // Register GSAP ScrollTrigger
 gsap.registerPlugin(ScrollTrigger);
-
-// TikTok Custom Icon
-const TikTokIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298 0 .59.043.87.126V9.4a6.33 6.33 0 0 0-.87-.06A6.34 6.34 0 0 0 3 15.68a6.34 6.34 0 0 0 10.82 4.47 6.27 6.27 0 0 0 1.87-4.48V8.75a8.17 8.17 0 0 0 4.9 1.62V6.93c-.34 0-.68-.08-1-.24z"/>
-  </svg>
-);
 
 // Formatted Metric Value for crisp, perfectly aligned typography
 export const FormattedMetricValue: React.FC<{ value: string }> = ({ value }) => {
@@ -136,6 +131,44 @@ export const MediaKitPage: React.FC = () => {
     setTimeout(() => setCopiedHandle(null), 2500);
   };
 
+  const generateProposalMessage = (customData?: typeof leadSubmittedData) => {
+    const info = customData || leadSubmittedData || {
+      name: leadName,
+      email: leadEmail,
+      phone: leadPhone,
+      budget: leadBudget,
+      message: leadMessage,
+    };
+    return (
+      `Olá, Sophia e assessoria!\n\n` +
+      `Gostaria de solicitar uma proposta comercial de parceria:\n\n` +
+      `• Marca / Solicitante: ${info.name}\n` +
+      `• E-mail de Contato: ${info.email}\n` +
+      `• WhatsApp / Telefone: ${info.phone || 'Não informado'}\n` +
+      `• Formato Desejado: ${info.budget}\n` +
+      `• Detalhes da Campanha / Mensagem:\n${info.message || 'Gostaria de receber a grade de valores e disponibilidade da Sophia Menezes para campanha.'}\n\n` +
+      `Aguardo o retorno de vocês!\n\n` +
+      `Atenciosamente,\n` +
+      `${info.name}`
+    );
+  };
+
+  const getMailtoUrl = (customData?: typeof leadSubmittedData) => {
+    const targetEmail = data.contact.email || 'Sophiaamenezes10@gmail.com';
+    const name = customData?.name || leadSubmittedData?.name || leadName || 'Marca';
+    const subject = encodeURIComponent(`[Proposta Comercial] ${name} - Mídia Kit`);
+    const body = encodeURIComponent(generateProposalMessage(customData));
+    return `mailto:${targetEmail}?subject=${subject}&body=${body}`;
+  };
+
+  const getGmailUrl = (customData?: typeof leadSubmittedData) => {
+    const targetEmail = data.contact.email || 'Sophiaamenezes10@gmail.com';
+    const name = customData?.name || leadSubmittedData?.name || leadName || 'Marca';
+    const subject = encodeURIComponent(`[Proposta Comercial] ${name} - Mídia Kit`);
+    const body = encodeURIComponent(generateProposalMessage(customData));
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${targetEmail}&su=${subject}&body=${body}`;
+  };
+
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const currentLead = {
@@ -148,48 +181,24 @@ export const MediaKitPage: React.FC = () => {
     
     setLeadSubmittedData(currentLead);
 
-    // Save lead in cloud database (Firestore)
-    await submitLead({
-      name: leadName,
-      email: leadEmail,
-      brand: leadName,
-      budget: leadBudget,
-      message: `${leadMessage} (Telefone/WhatsApp informado: ${leadPhone || 'Não informado'})`,
-    });
+    // Open Gmail directly in a new window/tab immediately on click
+    const gmailUrl = getGmailUrl(currentLead);
+    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+
+    // Optional silent Firestore recording without blocking or misleading user
+    try {
+      submitLead({
+        name: leadName,
+        email: leadEmail,
+        brand: leadName,
+        budget: leadBudget,
+        message: `${leadMessage} (WhatsApp informado: ${leadPhone || 'Não informado'})`,
+      }).catch(() => {});
+    } catch {
+      // Ignore background errors
+    }
 
     setFormSubmitted(true);
-  };
-
-  const generateProposalMessage = () => {
-    const info = leadSubmittedData || {
-      name: leadName,
-      email: leadEmail,
-      phone: leadPhone,
-      budget: leadBudget,
-      message: leadMessage,
-    };
-    return (
-      `Nova Proposta Comercial - Mídia Kit\n\n` +
-      `Nome / Marca: ${info.name}\n` +
-      `E-mail de Contato: ${info.email}\n` +
-      `Telefone de Contato: ${info.phone || 'Não informado'}\n` +
-      `Formato de Interesse: ${info.budget}\n` +
-      `Mensagem / Briefing: ${info.message || 'Gostaria de receber a grade de valores e disponibilidade da Sophia Menezes.'}`
-    );
-  };
-
-  const getMailtoUrl = () => {
-    const targetEmail = data.contact.email || 'Sophiaamenezes10@gmail.com';
-    const subject = encodeURIComponent(`[Proposta Comercial] ${leadSubmittedData?.name || leadName} - Mídia Kit`);
-    const body = encodeURIComponent(generateProposalMessage());
-    return `mailto:${targetEmail}?subject=${subject}&body=${body}`;
-  };
-
-  const getGmailUrl = () => {
-    const targetEmail = data.contact.email || 'Sophiaamenezes10@gmail.com';
-    const subject = encodeURIComponent(`[Proposta Comercial] ${leadSubmittedData?.name || leadName} - Mídia Kit`);
-    const body = encodeURIComponent(generateProposalMessage());
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${targetEmail}&su=${subject}&body=${body}`;
   };
 
   const handleOpenEmail = () => {
@@ -438,14 +447,30 @@ export const MediaKitPage: React.FC = () => {
               </Link>
             )}
 
+            {/* Instagram Button */}
             <a
-              href={data.instagram.profileUrl || `https://instagram.com/${data.instagram.handle.replace('@', '')}`}
+              href={data.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs uppercase tracking-wider font-semibold text-[#7B4B2A] hover:text-[#B8860B] transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#7B4B2A]/20 hover:border-[#D4AF37]"
+              className="text-xs font-semibold text-[#7B4B2A] hover:text-[#B8860B] bg-white/70 hover:bg-white transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#7B4B2A]/20 hover:border-[#D4AF37] shadow-2xs"
+              title="Acessar Instagram de Sophia Menezes"
             >
               <Instagram className="w-3.5 h-3.5 text-[#B8860B]" />
-              <span className="hidden md:inline">{data.instagram.handle}</span>
+              <span className="hidden md:inline">{data.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle}</span>
+              <span className="inline md:hidden">Instagram</span>
+            </a>
+
+            {/* TikTok Button */}
+            <a
+              href={data.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-semibold text-[#7B4B2A] hover:text-[#B8860B] bg-white/70 hover:bg-white transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#7B4B2A]/20 hover:border-[#D4AF37] shadow-2xs"
+              title="Acessar TikTok de Sophia Menezes"
+            >
+              <TikTokIcon className="w-3.5 h-3.5 text-[#B8860B]" />
+              <span className="hidden md:inline">{data.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle}</span>
+              <span className="inline md:hidden">TikTok</span>
             </a>
 
             <button
@@ -502,19 +527,19 @@ export const MediaKitPage: React.FC = () => {
                   <div className="text-left">
                     <span className="text-[10px] uppercase tracking-widest text-[#7B4B2A]/70 font-semibold block">Instagram</span>
                     <a
-                      href={data.instagram.profileUrl || `https://instagram.com/${data.instagram.handle.replace('@', '')}`}
+                      href={data.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-sm text-[#4A2E1F] hover:text-[#B8860B] transition-colors flex items-center gap-1"
                     >
-                      {data.instagram.handle}
+                      {data.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle}
                       <ArrowUpRight className="w-3.5 h-3.5 text-[#B8860B]" />
                     </a>
                   </div>
                   <button
-                    onClick={() => copyToClipboard(data.instagram.handle, 'ig')}
+                    onClick={() => copyToClipboard(data.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle, 'ig')}
                     title="Copiar usuário"
-                    className="p-1.5 text-[#7B4B2A]/60 hover:text-[#B8860B] hover:bg-[#F5EFE9] rounded-lg transition-colors ml-1"
+                    className="p-1.5 text-[#7B4B2A]/60 hover:text-[#B8860B] hover:bg-[#F5EFE9] rounded-lg transition-colors ml-1 cursor-pointer"
                   >
                     {copiedHandle === 'ig' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -526,19 +551,19 @@ export const MediaKitPage: React.FC = () => {
                   <div className="text-left">
                     <span className="text-[10px] uppercase tracking-widest text-[#7B4B2A]/70 font-semibold block">TikTok</span>
                     <a
-                      href={data.tiktok.profileUrl || `https://tiktok.com/@${data.tiktok.handle.replace('@', '')}`}
+                      href={data.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-sm text-[#4A2E1F] hover:text-[#B8860B] transition-colors flex items-center gap-1"
                     >
-                      {data.tiktok.handle}
+                      {data.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle}
                       <ArrowUpRight className="w-3.5 h-3.5 text-[#B8860B]" />
                     </a>
                   </div>
                   <button
-                    onClick={() => copyToClipboard(data.tiktok.handle, 'tk')}
+                    onClick={() => copyToClipboard(data.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle, 'tk')}
                     title="Copiar usuário"
-                    className="p-1.5 text-[#7B4B2A]/60 hover:text-[#B8860B] hover:bg-[#F5EFE9] rounded-lg transition-colors ml-1"
+                    className="p-1.5 text-[#7B4B2A]/60 hover:text-[#B8860B] hover:bg-[#F5EFE9] rounded-lg transition-colors ml-1 cursor-pointer"
                   >
                     {copiedHandle === 'tk' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -803,12 +828,12 @@ export const MediaKitPage: React.FC = () => {
               </h2>
             </div>
             <a
-              href={data.instagram.profileUrl || `https://instagram.com/${data.instagram.handle.replace('@', '')}`}
+              href={data.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 font-medium text-sm text-[#4A2E1F] hover:text-[#B8860B] transition-colors"
             >
-              <span>Ver perfil {data.instagram.handle}</span>
+              <span>Ver perfil {data.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle}</span>
               <ArrowUpRight className="w-4 h-4 text-[#D4AF37]" />
             </a>
           </div>
@@ -828,7 +853,7 @@ export const MediaKitPage: React.FC = () => {
               </div>
 
               <div className="space-y-4 pt-2">
-                {data.instagram.cityData.map((item, idx) => (
+                {(data.instagram?.cityData || []).map((item, idx) => (
                   <div key={idx} className="space-y-1.5">
                     <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
                       <span>{item.city}</span>
@@ -858,25 +883,34 @@ export const MediaKitPage: React.FC = () => {
               </div>
 
               <div className="space-y-4 pt-2">
-                {data.instagram.ageData.map((item, idx) => (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
-                      <span className="flex items-center gap-1.5">
-                        {item.range}
-                        {idx === 1 && (
-                          <span className="text-[10px] bg-[#D4AF37]/20 text-[#8C5E3C] px-1.5 py-0.5 rounded font-bold">Público Principal</span>
-                        )}
-                      </span>
-                      <span className="font-mono font-bold text-[#B8860B]">{item.percent}%</span>
-                    </div>
-                    <div className="h-3 w-full bg-[#ECE2D8] rounded-full overflow-hidden">
-                      <div
-                        className="gsap-bar h-full rounded-full bg-gradient-to-r from-[#7B4B2A] via-[#B8860B] to-[#D4AF37]"
-                        data-target-width={`${Math.min(item.percent * 1.8, 100)}%`}
-                      />
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  const items = data.instagram?.ageData || [];
+                  const maxPercent = Math.max(0, ...items.map((it) => it.percent || 0));
+                  return items.map((item, idx) => {
+                    const isTop = item.percent > 0 && item.percent === maxPercent;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
+                          <span className="flex items-center gap-1.5">
+                            {item.range}
+                            {isTop && (
+                              <span className="text-[10px] bg-[#D4AF37]/20 text-[#8C5E3C] px-1.5 py-0.5 rounded font-bold">
+                                Público Principal
+                              </span>
+                            )}
+                          </span>
+                          <span className="font-mono font-bold text-[#B8860B]">{item.percent}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-[#ECE2D8] rounded-full overflow-hidden">
+                          <div
+                            className="gsap-bar h-full rounded-full bg-gradient-to-r from-[#7B4B2A] via-[#B8860B] to-[#D4AF37]"
+                            data-target-width={`${Math.min(item.percent * 1.8, 100)}%`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -902,12 +936,12 @@ export const MediaKitPage: React.FC = () => {
               </h2>
             </div>
             <a
-              href={data.tiktok.profileUrl || `https://tiktok.com/@${data.tiktok.handle.replace('@', '')}`}
+              href={data.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 font-medium text-sm text-[#4A2E1F] hover:text-[#B8860B] transition-colors"
             >
-              <span>Ver perfil {data.tiktok.handle}</span>
+              <span>Ver perfil {data.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle}</span>
               <ArrowUpRight className="w-4 h-4 text-[#D4AF37]" />
             </a>
           </div>
@@ -927,7 +961,7 @@ export const MediaKitPage: React.FC = () => {
               </div>
 
               <div className="space-y-4 pt-2">
-                {data.tiktok.cityData.map((item, idx) => (
+                {(data.tiktok?.cityData || []).map((item, idx) => (
                   <div key={idx} className="space-y-1.5">
                     <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
                       <span>{item.city}</span>
@@ -957,25 +991,34 @@ export const MediaKitPage: React.FC = () => {
               </div>
 
               <div className="space-y-4 pt-2">
-                {data.tiktok.ageData.map((item, idx) => (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
-                      <span className="flex items-center gap-1.5">
-                        {item.range}
-                        {idx === 0 && (
-                          <span className="text-[10px] bg-[#D4AF37]/20 text-[#8C5E3C] px-1.5 py-0.5 rounded font-bold">Gen Z Conectada</span>
-                        )}
-                      </span>
-                      <span className="font-mono font-bold text-[#B8860B]">{item.percent}%</span>
-                    </div>
-                    <div className="h-3 w-full bg-[#ECE2D8] rounded-full overflow-hidden">
-                      <div
-                        className="gsap-bar h-full rounded-full bg-gradient-to-r from-[#7B4B2A] via-[#B8860B] to-[#D4AF37]"
-                        data-target-width={`${Math.min(item.percent * 1.8, 100)}%`}
-                      />
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  const items = data.tiktok?.ageData || [];
+                  const maxPercent = Math.max(0, ...items.map((it) => it.percent || 0));
+                  return items.map((item, idx) => {
+                    const isTop = item.percent > 0 && item.percent === maxPercent;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold tracking-wider text-[#4A2E1F]">
+                          <span className="flex items-center gap-1.5">
+                            {item.range}
+                            {isTop && (
+                              <span className="text-[10px] bg-[#D4AF37]/20 text-[#8C5E3C] px-1.5 py-0.5 rounded font-bold">
+                                Público Principal
+                              </span>
+                            )}
+                          </span>
+                          <span className="font-mono font-bold text-[#B8860B]">{item.percent}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-[#ECE2D8] rounded-full overflow-hidden">
+                          <div
+                            className="gsap-bar h-full rounded-full bg-gradient-to-r from-[#7B4B2A] via-[#B8860B] to-[#D4AF37]"
+                            data-target-width={`${Math.min(item.percent * 1.8, 100)}%`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -1039,18 +1082,35 @@ export const MediaKitPage: React.FC = () => {
 
               {/* Direct Contact Handles */}
               <div className="pt-6 border-t border-[#7B4B2A]/10 flex flex-wrap items-center justify-center gap-6 text-xs text-[#7B4B2A] font-medium">
-                <span className="flex items-center gap-1.5">
+                <a
+                  href={`mailto:${data.contact.email}`}
+                  className="flex items-center gap-1.5 hover:text-[#B8860B] transition-colors"
+                >
                   <Mail className="w-3.5 h-3.5 text-[#B8860B]" />
-                  {data.contact.email}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Instagram className="w-3.5 h-3.5 text-[#B8860B]" />
-                  {data.instagram.handle}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <TikTokIcon className="w-3.5 h-3.5 text-[#B8860B]" />
-                  {data.tiktok.handle}
-                </span>
+                  <span>{data.contact.email}</span>
+                </a>
+                <a
+                  href={data.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 hover:text-[#B8860B] transition-colors group"
+                  title="Abrir Instagram oficial"
+                >
+                  <Instagram className="w-3.5 h-3.5 text-[#B8860B] group-hover:scale-110 transition-transform" />
+                  <span>{data.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle}</span>
+                  <ExternalLink className="w-3 h-3 text-[#B8860B]/70" />
+                </a>
+                <a
+                  href={data.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 hover:text-[#B8860B] transition-colors group"
+                  title="Abrir TikTok oficial"
+                >
+                  <TikTokIcon className="w-3.5 h-3.5 text-[#B8860B] group-hover:scale-110 transition-transform" />
+                  <span>{data.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle}</span>
+                  <ExternalLink className="w-3 h-3 text-[#B8860B]/70" />
+                </a>
               </div>
 
             </div>
@@ -1091,27 +1151,20 @@ export const MediaKitPage: React.FC = () => {
 
             {formSubmitted ? (
               <div className="text-center py-6 space-y-4">
-                <CheckCircle2 className="w-12 h-12 text-emerald-700 mx-auto" />
+                <div className="w-16 h-16 bg-[#D4AF37]/15 rounded-full flex items-center justify-center mx-auto text-[#B8860B]">
+                  <Mail className="w-8 h-8 text-[#B8860B]" />
+                </div>
                 <div className="space-y-1">
                   <h3 className="font-serif text-2xl text-[#2C1810]">
-                    Proposta Registrada com Sucesso!
+                    Proposta Aberta no Gmail!
                   </h3>
-                  <p className="text-xs text-[#7B4B2A] font-light max-w-xs mx-auto">
-                    Os dados foram salvos no sistema da assessoria de {data.creator.name}.
+                  <p className="text-xs text-[#7B4B2A] max-w-sm mx-auto leading-relaxed">
+                    Sua proposta foi formatada com sucesso e aberta no Gmail pronta para envio direto à assessoria de {data.creator.name}.
                   </p>
                 </div>
 
                 <div className="bg-[#F5EFE9] border border-[#7B4B2A]/15 rounded-2xl p-4 text-left space-y-3 text-xs text-[#5A3825]">
-                  <div className="text-center pb-1 border-b border-[#7B4B2A]/10">
-                    <span className="font-semibold text-[#2C1810] text-[11px] uppercase tracking-wider block">
-                      Cópia Direta por E-mail
-                    </span>
-                    <span className="text-[11px] text-[#7B4B2A]">
-                      Sua proposta já foi salva. Você também pode enviá-la pelo seu e-mail:
-                    </span>
-                  </div>
-
-                  <div className="pt-1">
+                  <div className="space-y-2">
                     {/* Webmail / Gmail Direct */}
                     <a
                       href={getGmailUrl()}
@@ -1120,27 +1173,37 @@ export const MediaKitPage: React.FC = () => {
                       className="w-full bg-[#4A2E1F] hover:bg-[#7B4B2A] text-[#FAF7F2] font-semibold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 text-center shadow-xs cursor-pointer"
                     >
                       <ExternalLink className="w-4 h-4 text-[#D4AF37]" />
-                      <span>Abrir no Gmail</span>
+                      <span>Abrir no Gmail Novamente</span>
+                    </a>
+
+                    {/* Mailto alternative */}
+                    <a
+                      href={getMailtoUrl()}
+                      className="w-full bg-white hover:bg-[#FAF7F2] text-[#2C1810] border border-[#7B4B2A]/20 font-semibold py-2.5 px-4 rounded-xl text-[11px] uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 text-center cursor-pointer"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-[#B8860B]" />
+                      <span>Outro App de E-mail (Outlook / Apple Mail)</span>
                     </a>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white/70 rounded-xl px-3 py-2 border border-[#7B4B2A]/10 text-[11px]">
-                    <span className="text-[#7B4B2A] truncate">
-                      {data.contact.email}
-                    </span>
+                  <div className="flex items-center justify-between bg-white/80 rounded-xl px-3 py-2 border border-[#7B4B2A]/10 text-[11px]">
+                    <div className="truncate">
+                      <span className="text-[10px] text-[#7B4B2A]/70 uppercase block font-semibold">E-mail da Assessoria:</span>
+                      <span className="text-[#2C1810] font-medium truncate block">{data.contact.email}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => copyToClipboard(data.contact.email, 'E-mail')}
-                      className="text-[#B8860B] hover:text-[#7B4B2A] font-semibold flex items-center gap-1 shrink-0 ml-2 cursor-pointer"
+                      className="text-[#B8860B] hover:text-[#7B4B2A] font-semibold flex items-center gap-1 shrink-0 ml-2 cursor-pointer bg-[#FAF7F2] px-2.5 py-1 rounded-lg border border-[#D4AF37]/30 transition-colors"
                     >
                       <Copy className="w-3 h-3" />
-                      <span>Copiar</span>
+                      <span>{copiedHandle === 'E-mail' ? 'Copiado!' : 'Copiar'}</span>
                     </button>
                   </div>
                 </div>
 
                 <p className="text-[11px] text-[#7B4B2A]/80">
-                  Tempo médio de resposta: até <strong>{data.contact.responseTime}</strong>.
+                  Tempo médio de resposta da assessoria: até <strong>{data.contact.responseTime}</strong>.
                 </p>
 
                 <button
@@ -1167,7 +1230,7 @@ export const MediaKitPage: React.FC = () => {
                     Vamos trabalhar juntas
                   </h3>
                   <p className="text-xs text-[#7B4B2A] font-light">
-                    Preencha os dados da sua marca ou campanha para receber nossa proposta personalizada.
+                    Preencha os dados da sua marca ou campanha para abrir e enviar sua proposta diretamente pelo Gmail.
                   </p>
                 </div>
 
@@ -1272,11 +1335,14 @@ export const MediaKitPage: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full bg-[#4A2E1F] hover:bg-[#7B4B2A] text-[#FAF7F2] py-3 rounded-xl text-xs uppercase tracking-widest font-semibold transition-all duration-300 shadow-md flex items-center justify-center gap-2 mt-2"
+                    className="w-full bg-[#4A2E1F] hover:bg-[#7B4B2A] text-[#FAF7F2] py-3.5 rounded-xl text-xs uppercase tracking-widest font-semibold transition-all duration-300 shadow-md flex items-center justify-center gap-2 mt-2 cursor-pointer"
                   >
-                    <Send className="w-4 h-4 text-[#D4AF37]" />
-                    <span>Enviar Solicitação</span>
+                    <Mail className="w-4 h-4 text-[#D4AF37]" />
+                    <span>Enviar Proposta via Gmail</span>
                   </button>
+                  <p className="text-[11px] text-[#7B4B2A]/75 text-center mt-1">
+                    Ao clicar, seu Gmail será aberto com todos os dados preenchidos para envio direto.
+                  </p>
                 </form>
               </div>
             )}

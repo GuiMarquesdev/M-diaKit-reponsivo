@@ -23,8 +23,9 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
     return brands;
   }, [brands, activeFilter, activeBrands, pastBrands]);
 
-  const handleImageError = (id: string) => {
-    setFailedImages((prev) => ({ ...prev, [id]: true }));
+  const handleImageError = (url: string) => {
+    if (!url) return;
+    setFailedImages((prev) => ({ ...prev, [url]: true }));
   };
 
   return (
@@ -116,7 +117,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
           {filteredBrands.map((brand) => {
-            const hasImageFailed = failedImages[brand.id] || !brand.logoUrl;
+            const hasImageFailed = !brand.logoUrl || failedImages[brand.logoUrl];
             const initials = brand.name
               .split(' ')
               .map((w) => w[0])
@@ -157,7 +158,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                     <img
                       src={brand.logoUrl}
                       alt={`Logo da marca ${brand.name}`}
-                      onError={() => handleImageError(brand.id)}
+                      onError={() => handleImageError(brand.logoUrl)}
                       className="max-h-full max-w-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.06)] group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                     />

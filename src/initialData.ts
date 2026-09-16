@@ -1,4 +1,5 @@
 import { MediaKitData } from './types';
+import { OFFICIAL_SOCIAL_LINKS } from './constants';
 
 export const initialMediaKitData: MediaKitData = {
   creator: {
@@ -28,8 +29,8 @@ export const initialMediaKitData: MediaKitData = {
     monthlyImpressionsLabel: '5.9M+',
   },
   instagram: {
-    handle: '@sophiamenezes',
-    profileUrl: 'https://instagram.com',
+    handle: OFFICIAL_SOCIAL_LINKS.instagram.handle,
+    profileUrl: OFFICIAL_SOCIAL_LINKS.instagram.url,
     followers: '285K',
     reach: '2.4M/mês',
     engagement: '5.8%',
@@ -52,8 +53,8 @@ export const initialMediaKitData: MediaKitData = {
     bestReelViews: '1.2M',
   },
   tiktok: {
-    handle: '@sophiamenezes',
-    profileUrl: 'https://tiktok.com',
+    handle: OFFICIAL_SOCIAL_LINKS.tiktok.handle,
+    profileUrl: OFFICIAL_SOCIAL_LINKS.tiktok.url,
     followers: '420K',
     likes: '6.8M',
     avgViews: '85K',

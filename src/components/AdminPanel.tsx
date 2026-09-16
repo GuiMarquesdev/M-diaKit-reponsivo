@@ -31,6 +31,10 @@ import { useAuth } from '../context/AuthContext';
 import { ImageUploadField } from './ImageUploadField';
 import { AdminBrandsEditor } from './AdminBrandsEditor';
 import { AdminPartnershipFormatsEditor } from './AdminPartnershipFormatsEditor';
+import { AdminInstagramEditor } from './AdminInstagramEditor';
+import { AdminTikTokEditor } from './AdminTikTokEditor';
+import { OFFICIAL_SOCIAL_LINKS } from '../constants';
+import { TikTokIcon } from './SocialIcons';
 
 interface AdminPanelProps {
   isOpen?: boolean;
@@ -86,6 +90,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     cancel2FA,
   } = useAuth();
   const [formData, setFormData] = useState<MediaKitData>(data);
+  const [isDirty, setIsDirty] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('creator');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -136,10 +141,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // Sync state when data props change
+  // Sync state when data props change, avoiding clobbering in-flight user edits
   React.useEffect(() => {
-    setFormData(data);
-  }, [data]);
+    if (!isDirty) {
+      setFormData(data);
+    }
+  }, [data, isDirty]);
 
   // Mobile tabs horizontal scroll reference & active tab helpers
   const mobileTabsRef = useRef<HTMLDivElement>(null);
@@ -219,10 +226,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setErrorMessage(null);
     const success = await onSave(formData);
     if (success) {
+      setIsDirty(false);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3500);
     } else {
-      setErrorMessage('Falha ao salvar no banco. Verifique suas permissões.');
+      setErrorMessage('Falha ao salvar no banco de dados. Verifique a conexão ou se o tamanho das imagens excede os limites.');
     }
   };
 
@@ -279,6 +287,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            {/* Quick Link Instagram */}
+            <a
+              href={formData.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#4A2E1F] bg-white hover:bg-[#FAF7F2] border border-[#7B4B2A]/20 hover:border-[#D4AF37] rounded-xl transition-all shadow-2xs cursor-pointer group"
+              title="Abrir perfil oficial no Instagram"
+            >
+              <Instagram className="w-3.5 h-3.5 text-[#B8860B] group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Instagram</span>
+              <ExternalLink className="w-3 h-3 text-[#7B4B2A]/50 group-hover:text-[#B8860B]" />
+            </a>
+
+            {/* Quick Link TikTok */}
+            <a
+              href={formData.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#4A2E1F] bg-white hover:bg-[#FAF7F2] border border-[#7B4B2A]/20 hover:border-[#D4AF37] rounded-xl transition-all shadow-2xs cursor-pointer group"
+              title="Abrir perfil oficial no TikTok"
+            >
+              <TikTokIcon className="w-3.5 h-3.5 text-[#B8860B] group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">TikTok</span>
+              <ExternalLink className="w-3 h-3 text-[#7B4B2A]/50 group-hover:text-[#B8860B]" />
+            </a>
+
             {onClose && (
               <button
                 type="button"
@@ -613,6 +647,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   );
                 })}
               </div>
+
+              {/* Mobile Quick Social Links Bar */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#7B4B2A]/10 text-xs">
+                <span className="text-[10px] uppercase font-bold text-[#7B4B2A]/80 tracking-wider">Perfis Oficiais:</span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={formData.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-[#4A2E1F] hover:text-[#B8860B] border border-[#7B4B2A]/15 text-[11px] font-semibold transition-colors shadow-2xs"
+                    title="Abrir Instagram"
+                  >
+                    <Instagram className="w-3 h-3 text-[#B8860B]" />
+                    <span>Instagram</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-[#7B4B2A]/60" />
+                  </a>
+                  <a
+                    href={formData.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-[#4A2E1F] hover:text-[#B8860B] border border-[#7B4B2A]/15 text-[11px] font-semibold transition-colors shadow-2xs"
+                    title="Abrir TikTok"
+                  >
+                    <TikTokIcon className="w-3 h-3 text-[#B8860B]" />
+                    <span>TikTok</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-[#7B4B2A]/60" />
+                  </a>
+                </div>
+              </div>
             </div>
 
             {/* Desktop Sidebar Navigation (>= md) */}
@@ -622,25 +685,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Seções do Mídia Kit ({TABS.length})
                 </span>
               </div>
-              {TABS.map((tab) => {
-                const TabIcon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
-                      isActive
-                        ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm ring-1 ring-[#D4AF37]/40 font-bold'
-                        : 'text-[#7B4B2A] hover:bg-[#FAF7F2] hover:text-[#2C1810]'
-                    }`}
-                  >
-                    <TabIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#D4AF37]' : 'text-[#7B4B2A]'}`} />
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                );
-              })}
+              <div className="space-y-1">
+                {TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                        isActive
+                          ? 'bg-[#4A2E1F] text-[#FAF7F2] shadow-sm ring-1 ring-[#D4AF37]/40 font-bold'
+                          : 'text-[#7B4B2A] hover:bg-[#FAF7F2] hover:text-[#2C1810]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 truncate">
+                        <TabIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#D4AF37]' : 'text-[#7B4B2A]'}`} />
+                        <span className="truncate">{tab.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Perfis Oficiais Quick Access Section */}
+              <div className="mt-auto pt-3 border-t border-[#7B4B2A]/15 space-y-1.5">
+                <div className="px-2 pb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B4B2A]">
+                    Links Oficiais
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Ativo" />
+                </div>
+
+                <a
+                  href={formData.instagram.profileUrl || OFFICIAL_SOCIAL_LINKS.instagram.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-[#4A2E1F] bg-white/70 hover:bg-white hover:text-[#B8860B] border border-[#7B4B2A]/10 hover:border-[#D4AF37]/50 transition-all shadow-2xs group"
+                  title="Abrir perfil oficial do Instagram em nova aba"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Instagram className="w-3.5 h-3.5 text-[#B8860B] shrink-0 group-hover:scale-110 transition-transform" />
+                    <span className="truncate">{formData.instagram.handle || OFFICIAL_SOCIAL_LINKS.instagram.handle}</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-[#7B4B2A]/50 group-hover:text-[#B8860B] shrink-0" />
+                </a>
+
+                <a
+                  href={formData.tiktok.profileUrl || OFFICIAL_SOCIAL_LINKS.tiktok.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-[#4A2E1F] bg-white/70 hover:bg-white hover:text-[#B8860B] border border-[#7B4B2A]/10 hover:border-[#D4AF37]/50 transition-all shadow-2xs group"
+                  title="Abrir perfil oficial do TikTok em nova aba"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <TikTokIcon className="w-3.5 h-3.5 text-[#B8860B] shrink-0 group-hover:scale-110 transition-transform" />
+                    <span className="truncate">{formData.tiktok.handle || OFFICIAL_SOCIAL_LINKS.tiktok.handle}</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-[#7B4B2A]/50 group-hover:text-[#B8860B] shrink-0" />
+                </a>
+              </div>
             </div>
 
             {/* Form Fields Body */}
@@ -963,202 +1068,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               {/* Tab 4: Instagram */}
               {activeTab === 'instagram' && (
-                <div className="space-y-4 max-w-2xl">
-                  <h3 className="font-serif text-lg font-bold text-[#2C1810] border-b border-[#7B4B2A]/15 pb-2">
-                    Estatísticas do Instagram
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Handle (@)</label>
-                      <input
-                        type="text"
-                        value={formData.instagram.handle}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: { ...formData.instagram, handle: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Seguidores</label>
-                      <input
-                        type="text"
-                        value={formData.instagram.followers}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: { ...formData.instagram, followers: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Alcance Mensal</label>
-                      <input
-                        type="text"
-                        value={formData.instagram.reach}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: { ...formData.instagram, reach: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Taxa Engajamento</label>
-                      <input
-                        type="text"
-                        value={formData.instagram.engagement}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: { ...formData.instagram, engagement: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Média Views Reels</label>
-                      <input
-                        type="text"
-                        value={formData.instagram.viewsPerReels}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: { ...formData.instagram, viewsPerReels: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Público Feminino (%)</label>
-                      <input
-                        type="number"
-                        value={formData.instagram.femaleAudience}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            instagram: {
-                              ...formData.instagram,
-                              femaleAudience: Number(e.target.value),
-                              maleAudience: 100 - Number(e.target.value),
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Público Masculino (%)</label>
-                      <input
-                        type="number"
-                        value={formData.instagram.maleAudience}
-                        readOnly
-                        className="w-full px-3 py-2 text-xs bg-neutral-100 border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <AdminInstagramEditor
+                  instagram={formData.instagram}
+                  onChange={(updatedInstagram) =>
+                    setFormData({
+                      ...formData,
+                      instagram: updatedInstagram,
+                    })
+                  }
+                />
               )}
 
               {/* Tab 5: TikTok */}
               {activeTab === 'tiktok' && (
-                <div className="space-y-4 max-w-2xl">
-                  <h3 className="font-serif text-lg font-bold text-[#2C1810] border-b border-[#7B4B2A]/15 pb-2">
-                    Estatísticas do TikTok
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Handle (@)</label>
-                      <input
-                        type="text"
-                        value={formData.tiktok.handle}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tiktok: { ...formData.tiktok, handle: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Seguidores TikTok</label>
-                      <input
-                        type="text"
-                        value={formData.tiktok.followers}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tiktok: { ...formData.tiktok, followers: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Total de Curtidas</label>
-                      <input
-                        type="text"
-                        value={formData.tiktok.likes}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tiktok: { ...formData.tiktok, likes: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Média Views</label>
-                      <input
-                        type="text"
-                        value={formData.tiktok.avgViews}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tiktok: { ...formData.tiktok, avgViews: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7B4B2A] mb-1">Recorde Viral</label>
-                      <input
-                        type="text"
-                        value={formData.tiktok.viralRecord}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tiktok: { ...formData.tiktok, viralRecord: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#7B4B2A]/25 rounded-xl"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <AdminTikTokEditor
+                  tiktok={formData.tiktok}
+                  onChange={(updatedTikTok) =>
+                    setFormData({
+                      ...formData,
+                      tiktok: updatedTikTok,
+                    })
+                  }
+                />
               )}
 
               {/* Tab 6: Editorial Segments */}
@@ -1236,7 +1167,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {activeTab === 'brands' && (
                 <AdminBrandsEditor
                   brands={formData.brands || []}
-                  onChange={(newBrands) => setFormData({ ...formData, brands: newBrands })}
+                  onChange={(newBrands) => {
+                    setIsDirty(true);
+                    setFormData({ ...formData, brands: newBrands });
+                  }}
+                  onSaveDirect={handleSave}
+                  saving={saving}
                 />
               )}
 
