@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BrandPartner } from '../types';
-import { ArrowUpRight, Maximize2, X, ExternalLink } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 interface BrandsSectionProps {
   brands: BrandPartner[];
@@ -9,8 +9,7 @@ interface BrandsSectionProps {
 
 // Helper to generate modern picture sources with 1x, 2x, 3x HiDPI srcset
 interface BrandSourceSet {
-  avifSrcSet?: string;
-  webpSrcSet: string;
+  webpSrcSet?: string;
   fallbackUrl: string;
 }
 
@@ -25,11 +24,10 @@ const getBrandPictureSources = (url?: string, brandId?: string, brandName?: stri
   else if (brandId === 'brand-7' || brandName?.includes('Look de Hoje')) staticIndex = '6';
 
   if (staticIndex) {
-    const v = '1080p_r4';
+    const v = '1080p_r6';
     return {
-      avifSrcSet: `/brand-images/brand-${staticIndex}.avif?v=${v} 1x, /brand-images/brand-${staticIndex}.avif?v=${v} 2x`,
-      webpSrcSet: `/brand-images/brand-${staticIndex}_1x.webp?v=${v} 1x, /brand-images/brand-${staticIndex}_2x.webp?v=${v} 2x, /brand-images/brand-${staticIndex}_3x.webp?v=${v} 3x`,
-      fallbackUrl: `/brand-images/brand-${staticIndex}.webp?v=${v}`,
+      webpSrcSet: `/brand-images/brand-${staticIndex}_sharp.webp?v=${v} 1x, /brand-images/brand-${staticIndex}_sharp.webp?v=${v} 2x`,
+      fallbackUrl: `/brand-images/brand-${staticIndex}_sharp.webp?v=${v}`,
     };
   }
 
@@ -38,14 +36,13 @@ const getBrandPictureSources = (url?: string, brandId?: string, brandName?: stri
     const cleanUrl = url.split('&w=')[0].split('?w=')[0];
     const baseParams = cleanUrl.includes('?') ? cleanUrl : `${cleanUrl}?auto=format&fit=crop`;
     return {
-      webpSrcSet: `${baseParams}&w=450&q=85 1x, ${baseParams}&w=900&q=90 2x, ${baseParams}&w=1400&q=95 3x`,
+      webpSrcSet: `${baseParams}&w=450&q=85 450w, ${baseParams}&w=900&q=90 900w, ${baseParams}&w=1400&q=95 1400w`,
       fallbackUrl: `${baseParams}&w=900&q=90`,
     };
   }
 
-  const fallback = url || '';
+  const fallback = url || '/brand-images/brand-1.webp?v=1080p_r5';
   return {
-    webpSrcSet: `${fallback} 1x`,
     fallbackUrl: fallback,
   };
 };
@@ -60,7 +57,6 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
 }) => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'past'>('all');
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
-  const [previewBrand, setPreviewBrand] = useState<BrandPartner | null>(null);
 
   const activeBrands = useMemo(() => brands.filter((b) => b.status === 'active'), [brands]);
   const pastBrands = useMemo(() => brands.filter((b) => b.status === 'past'), [brands]);
@@ -182,16 +178,22 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                 key={brand.id}
                 className="group relative bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#7B4B2A]/20 hover:border-[#D4AF37] transition-all duration-300 warm-shadow flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-lg"
               >
-                {/* Modern Editorial Campaign & Logo Showcase Frame - Fluid Responsive Aspect Ratio Without Stretching */}
+                {/* Modern Editorial Campaign & Logo Showcase Frame - Native crisp scale with ambient background */}
                 <div
-                  className={`relative w-full h-44 sm:h-48 rounded-xl overflow-hidden mb-4 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none flex items-center justify-center ${
+                  className={`relative w-full h-44 sm:h-48 rounded-xl overflow-hidden mb-4 transition-all duration-300 shadow-xs group-hover:shadow-md select-none flex items-center justify-center ${
                     isContain
                       ? 'bg-white border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
-                      : 'bg-[#F4EFEA] border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
+                      : 'bg-gradient-to-b from-[#2C1810]/5 via-[#FAF7F2] to-[#7B4B2A]/10 border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
                   }`}
-                  onClick={() => !hasImageFailed && setPreviewBrand(brand)}
-                  title="Clique para ampliar o registro de campanha"
                 >
+                  {/* Ambient Blurred Backdrop to avoid empty bars while keeping image at 100% natural sharpness */}
+                  {!isContain && !hasImageFailed && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-25 blur-md scale-110 pointer-events-none"
+                      style={{ backgroundImage: `url(${brandSources.fallbackUrl})` }}
+                    />
+                  )}
+
                   {/* Status Indicator Floating Glass Badge */}
                   <div className="absolute top-3 left-3 z-20">
                     {brand.status === 'active' ? (
@@ -210,30 +212,24 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                     )}
                   </div>
 
-                  {/* Expand Icon Button in Top Right */}
-                  <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <span className="w-7 h-7 rounded-full bg-black/60 border border-white/20 text-[#FAF7F2] flex items-center justify-center backdrop-blur-md shadow-sm hover:scale-110 transition-transform">
-                      <Maximize2 className="w-3.5 h-3.5 text-[#D4AF37]" />
-                    </span>
-                  </div>
-
-                  {/* High-Resolution Picture Element with AVIF + WebP and HiDPI srcset */}
+                  {/* High-Resolution Picture Element with WebP HiDPI srcset */}
                   {!hasImageFailed ? (
                     <picture className="relative z-10 w-full h-full flex items-center justify-center overflow-hidden">
-                      {brandSources.avifSrcSet && (
-                        <source type="image/avif" srcSet={brandSources.avifSrcSet} />
-                      )}
                       {brandSources.webpSrcSet && (
-                        <source type="image/webp" srcSet={brandSources.webpSrcSet} />
+                        <source
+                          type="image/webp"
+                          srcSet={brandSources.webpSrcSet}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 360px"
+                        />
                       )}
                       <img
                         src={brandSources.fallbackUrl}
                         alt={`Campanha ou marca ${brand.name}`}
-                        onError={() => handleImageError(brand.logoUrl)}
+                        onError={() => handleImageError(brandSources.fallbackUrl)}
                         className={`transition-transform duration-500 ease-out group-hover:scale-102 will-change-transform crisp-img ${
                           isContain
-                            ? 'max-w-full max-h-full w-auto h-auto object-contain p-6 sm:p-7'
-                            : 'w-full h-full max-w-full object-cover'
+                            ? 'max-w-full max-h-full w-auto h-auto object-contain p-5'
+                            : 'h-full w-auto max-w-full object-contain mx-auto'
                         }`}
                         style={{
                           objectPosition: brand.imageAlignment || (isContain ? 'center center' : 'center 22%'),
@@ -340,108 +336,6 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
           <ArrowUpRight className="w-4 h-4 text-[#D4AF37] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
         </button>
       </div>
-
-      {/* Lightbox Modal for Full Campaign Shoot Preview - Sized compactly for maximum 1080p pixel density */}
-      {previewBrand && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5"
-          onClick={() => setPreviewBrand(null)}
-        >
-          <div
-            className="relative max-w-xl w-full bg-[#1C120C] border border-[#D4AF37]/50 rounded-2xl overflow-hidden shadow-2xl p-4 sm:p-5 text-white space-y-3.5 animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-serif text-lg sm:text-xl font-bold text-[#FAF7F2]">
-                    {previewBrand.name}
-                  </h3>
-                  {previewBrand.status === 'active' ? (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/40">
-                      Parceria Ativa
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FAF7F2]/10 text-[#D4AF37] border border-[#D4AF37]/40">
-                      Campanha Entregue
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-[#D4AF37] mt-0.5">
-                  {previewBrand.category} • {previewBrand.campaignType}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setPreviewBrand(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors"
-                title="Fechar visualização"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="relative rounded-xl overflow-hidden max-h-[60vh] bg-[#140D09]/95 flex items-center justify-center border border-white/10 p-2 sm:p-4">
-              {(() => {
-                const previewSources = getBrandPictureSources(previewBrand.logoUrl, previewBrand.id, previewBrand.name);
-                return (
-                  <picture className="flex items-center justify-center max-w-full max-h-[55vh]">
-                    {previewSources.avifSrcSet && (
-                      <source type="image/avif" srcSet={previewSources.avifSrcSet} />
-                    )}
-                    {previewSources.webpSrcSet && (
-                      <source type="image/webp" srcSet={previewSources.webpSrcSet} />
-                    )}
-                    <img
-                      src={previewSources.fallbackUrl}
-                      alt={previewBrand.name}
-                      className="w-auto h-auto max-w-full max-h-[52vh] object-contain rounded-lg shadow-2xl select-none crisp-img"
-                      style={{
-                        imageRendering: '-webkit-optimize-contrast',
-                        WebkitBackfaceVisibility: 'hidden',
-                        backfaceVisibility: 'hidden',
-                        transform: 'translateZ(0)',
-                      }}
-                    />
-                  </picture>
-                );
-              })()}
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <p className="text-xs text-[#FAF7F2]/80">
-                Ensaio e publicidade em parceria com Sophia Menezes.
-              </p>
-
-              <div className="flex items-center gap-2">
-                {previewBrand.websiteUrl && (
-                  <a
-                    href={previewBrand.websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
-                  >
-                    <span>Conhecer Marca</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreviewBrand(null);
-                    onOpenContactModal();
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[#D4AF37] hover:bg-[#B8860B] text-[#2C1810] font-bold transition-colors cursor-pointer shadow-md"
-                >
-                  <span>Proposta Semelhante</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 };
