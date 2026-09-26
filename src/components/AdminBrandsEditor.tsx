@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { BrandPartner } from '../types';
+import { BrandImageTuner } from './BrandImageTuner';
+import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
 import {
   Plus,
   Trash2,
@@ -16,6 +18,8 @@ import {
   AlertCircle,
   Sparkles,
   Info,
+  RefreshCw,
+  Zap,
 } from 'lucide-react';
 
 interface AdminBrandsEditorProps {
@@ -47,97 +51,12 @@ const PRESET_CAMPAIGNS = [
   'Contrato Semestral',
 ];
 
-// Compress and convert file preserving transparency strictly for PNG/SVG and high quality for JPG/WEBP
-const readLogoFile = (file: File): Promise<{ dataUrl: string; sizeKb: number }> => {
-  return new Promise((resolve, reject) => {
-    const fileName = file.name.toLowerCase();
-    const isSvg = file.type === 'image/svg+xml' || fileName.endsWith('.svg');
-    const isPng = file.type === 'image/png' || fileName.endsWith('.png');
-    const isJpg =
-      file.type === 'image/jpeg' ||
-      file.type === 'image/jpg' ||
-      fileName.endsWith('.jpg') ||
-      fileName.endsWith('.jpeg');
-    const isWebp = file.type === 'image/webp' || fileName.endsWith('.webp');
-
-    if (!isSvg && !isPng && !isJpg && !isWebp) {
-      reject(new Error('Formato não suportado. Por favor utilize arquivos PNG, JPG, JPEG, WEBP ou SVG.'));
-      return;
-    }
-
-    if (file.size > 8 * 1024 * 1024) {
-      reject(new Error('Arquivo muito pesado. O limite máximo para upload é de 8 MB.'));
-      return;
-    }
-
-    const reader = new FileReader();
-
-    if (isSvg) {
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        if (result.length > 80 * 1024) {
-          reject(new Error('Arquivo SVG muito complexo (>80 KB). Recomendamos exportar em PNG com fundo transparente.'));
-          return;
-        }
-        const sizeKb = Math.round(result.length / 1024);
-        resolve({ dataUrl: result, sizeKb });
-      };
-      reader.onerror = () => reject(new Error('Falha ao ler o arquivo SVG.'));
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    // Raster images (PNG, JPG, WEBP)
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        // High definition dimension of 1200px provides pristine Retina and 4K clarity on public cards and modal zoom
-        const maxDimension = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > maxDimension) {
-          height = Math.round((height * maxDimension) / width);
-          width = maxDimension;
-        } else if (height > maxDimension) {
-          width = Math.round((width * maxDimension) / height);
-          height = maxDimension;
-        }
-
-        canvas.width = Math.max(1, width);
-        canvas.height = Math.max(1, height);
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          const raw = event.target?.result as string;
-          resolve({ dataUrl: raw, sizeKb: Math.round(raw.length / 1024) });
-          return;
-        }
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        // Keep alpha transparency on PNG/WebP; high quality WebP/JPEG for others
-        let dataUrl: string;
-        if (isPng) {
-          dataUrl = canvas.toDataURL('image/png');
-        } else if (isWebp) {
-          dataUrl = canvas.toDataURL('image/webp', 0.90);
-        } else {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.90);
-        }
-
-        const sizeKb = Math.round(dataUrl.length / 1024);
-        resolve({ dataUrl, sizeKb });
-      };
-      img.onerror = () => reject(new Error('Não foi possível decodificar a imagem informada.'));
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Falha ao processar arquivo selecionado.'));
-    reader.readAsDataURL(file);
+// Compress and convert file using smart auto-optimizer (keeps under 55 KB per image, pristine WebP)
+const readLogoFile = async (file: File) => {
+  return autoOptimizeImageFile(file, {
+    maxDimension: 800,
+    targetMaxKb: 55,
+    preferredQuality: 0.82,
   });
 };
 
@@ -150,8 +69,15 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'past'>('all');
   const [editingId, setEditingId] = useState<string | null>(brands[0]?.id || null);
   const [uploadError, setUploadError] = useState<{ id: string; message: string } | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<{ id: string; sizeKb: number } | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<{
+    id: string;
+    sizeKb: number;
+    originalKb?: number;
+    reduction?: number;
+  } | null>(null);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [isBatchOptimizing, setIsBatchOptimizing] = useState(false);
+  const [batchSuccessMessage, setBatchSuccessMessage] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleAddBrand = () => {
@@ -193,16 +119,62 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
     onChange(updated);
   };
 
+  // Automated one-click batch adequacy of all existing brands
+  const handleAutoAdequateAllBrands = async () => {
+    setIsBatchOptimizing(true);
+    setBatchSuccessMessage(null);
+    try {
+      let count = 0;
+      let totalSavedKb = 0;
+      const updatedBrands = [...brands];
+
+      for (let i = 0; i < updatedBrands.length; i++) {
+        const b = updatedBrands[i];
+        if (b.logoUrl && (b.logoUrl.startsWith('data:') || b.logoUrl.startsWith('blob:'))) {
+          const rawKb = Math.round((b.logoUrl.length * 0.75) / 1024);
+          if (rawKb > 55 || !b.logoUrl.startsWith('data:image/webp')) {
+            const res = await autoOptimizeDataUrl(b.logoUrl, {
+              maxDimension: 800,
+              targetMaxKb: 50,
+              preferredQuality: 0.80,
+              originalSizeKb: rawKb,
+            });
+            updatedBrands[i] = { ...b, logoUrl: res.dataUrl };
+            count++;
+            totalSavedKb += Math.max(0, rawKb - res.optimizedSizeKb);
+          }
+        }
+      }
+
+      onChange(updatedBrands);
+      if (count > 0) {
+        setBatchSuccessMessage(`Sucesso! ${count} marcas foram adequadas automaticamente (economia de ${totalSavedKb} KB).`);
+      } else {
+        setBatchSuccessMessage('Todas as marcas já estão 100% adequadas e otimizadas para a nuvem!');
+      }
+      setTimeout(() => setBatchSuccessMessage(null), 5000);
+    } catch (err: any) {
+      console.error('Falha na adequação em lote:', err);
+    } finally {
+      setIsBatchOptimizing(false);
+    }
+  };
+
   const processFile = async (brandId: string, file: File) => {
     setUploadError(null);
     try {
-      const { dataUrl, sizeKb } = await readLogoFile(file);
-      handleUpdateBrand(brandId, { logoUrl: dataUrl });
-      setUploadSuccess({ id: brandId, sizeKb });
-      setTimeout(() => setUploadSuccess(null), 4000);
+      const res = await readLogoFile(file);
+      handleUpdateBrand(brandId, { logoUrl: res.dataUrl });
+      setUploadSuccess({
+        id: brandId,
+        sizeKb: res.optimizedSizeKb,
+        originalKb: res.originalSizeKb,
+        reduction: res.reductionPercentage,
+      });
+      setTimeout(() => setUploadSuccess(null), 6000);
     } catch (err: any) {
       console.error('Erro ao processar imagem de logo:', err);
-      setUploadError({ id: brandId, message: err?.message || 'Falha ao processar a imagem.' });
+      setUploadError({ id: brandId, message: err?.message || 'Falha ao processar e adequar a imagem.' });
       setTimeout(() => setUploadError(null), 5000);
     }
   };
@@ -260,7 +232,18 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleAutoAdequateAllBrands}
+            disabled={isBatchOptimizing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#4A2E1F] bg-white hover:bg-[#FAF7F2] border border-[#D4AF37]/60 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+            title="Adequar e converter automaticamente todas as fotos para o padrão leve WebP"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-[#B8860B] ${isBatchOptimizing ? 'animate-spin' : ''}`} />
+            <span>{isBatchOptimizing ? 'Adequando Imagens...' : 'Auto-Adequar Todas as Imagens'}</span>
+          </button>
+
           {onSaveDirect && (
             <button
               type="button"
@@ -283,6 +266,13 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
           </button>
         </div>
       </div>
+
+      {batchSuccessMessage && (
+        <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2 text-xs text-emerald-800 font-semibold animate-fadeIn shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{batchSuccessMessage}</span>
+        </div>
+      )}
 
       {/* Cloud Storage Notice */}
       <div className="p-3 bg-[#FAF7F2] border border-[#D4AF37]/35 rounded-xl flex items-start gap-2.5 text-xs text-[#7B4B2A]">
@@ -686,9 +676,11 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
 
                           {/* Upload Feedback Messages */}
                           {uploadSuccess?.id === brand.id && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Imagem otimizada com sucesso ({uploadSuccess.sizeKb} KB) pronta para salvar!</span>
+                            <div className="flex items-center gap-2 text-[11px] text-emerald-900 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-300 animate-fadeIn">
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>
+                                Imagem adequada automaticamente: <strong>{uploadSuccess.originalKb ? `${uploadSuccess.originalKb} KB ➔ ` : ''}{uploadSuccess.sizeKb} KB</strong> {uploadSuccess.reduction ? `(${uploadSuccess.reduction}% menor, 100% segura para nuvem)` : 'pronta para salvar!'}
+                              </span>
                             </div>
                           )}
 
@@ -738,6 +730,12 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
                                 : '• Exibição editorial de alta elegância: preenche o quadro com efeito revista e desfoque ambiental de fundo, perfeito para fotos reais de campanha e produtos.'}
                             </p>
                           </div>
+
+                          {/* Brand Image Alignment & Resolution Tuning Tool */}
+                          <BrandImageTuner
+                            brand={brand}
+                            onUpdate={(updates) => handleUpdateBrand(brand.id, updates)}
+                          />
                         </div>
                       </div>
                     </div>

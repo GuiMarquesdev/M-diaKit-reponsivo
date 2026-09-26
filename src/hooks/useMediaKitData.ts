@@ -4,11 +4,37 @@ import { db } from '../lib/firebase';
 import { initialMediaKitData } from '../initialData';
 import { MediaKitData } from '../types';
 import { OFFICIAL_SOCIAL_LINKS } from '../constants';
+import { autoAdequateAllMediaKitImages } from '../utils/imageOptimizer';
 
-const STORAGE_KEY = 'sophiamenezes_mediakit_data_cache';
+const STORAGE_KEY = 'sophiamenezes_mediakit_data_cache_v3';
+
+const BRAND_HIGH_RES_MAP: Record<string, string> = {
+  'brand-1': '/brand-images/brand-1.webp',
+  'brand-2': '/brand-images/brand-2.webp',
+  'brand-3': '/brand-images/brand-3.webp',
+  'brand-4': '/brand-images/brand-4.webp',
+  'brand-5': '/brand-images/brand-5.webp',
+  'brand-7': '/brand-images/brand-6.webp',
+};
+
+const normalizeBrands = (brands: any[]) => {
+  if (!Array.isArray(brands)) return brands;
+  return brands.map((b) => {
+    // If the brand still holds an old pixelated low-res data URI or outdated url, upgrade to pristine high-res webp
+    if (b && b.id && BRAND_HIGH_RES_MAP[b.id]) {
+      if (!b.logoUrl || b.logoUrl.startsWith('data:image/jpeg') || b.logoUrl.startsWith('data:image/png')) {
+        return { ...b, logoUrl: BRAND_HIGH_RES_MAP[b.id] };
+      }
+    }
+    return b;
+  });
+};
 
 const normalizeSocialLinks = (target: any) => {
   if (!target) return;
+  if (target.brands) {
+    target.brands = normalizeBrands(target.brands);
+  }
   if (target.contact && (target.contact.email === 'contato@sophiamenezes.com.br' || !target.contact.email)) {
     target.contact.email = 'Sophiaamenezes10@gmail.com';
   }
@@ -117,16 +143,36 @@ export function useMediaKitData() {
     setError(null);
     try {
       // 1. Sanitize to prevent undefined values which break Firestore setDoc
-      const cleanData: MediaKitData = JSON.parse(
+      let cleanData: MediaKitData = JSON.parse(
         JSON.stringify(newData, (_, value) => (value === undefined ? null : value))
       );
 
-      // 2. Validate payload size before Firestore rejection (Firestore document ceiling is 1MB)
-      const payloadString = JSON.stringify(cleanData);
-      const payloadBytes = new Blob([payloadString]).size;
+      // 2. Intelligent Auto-Adequacy Pipeline:
+      // If total payload size exceeds 550 KB or contains uncompressed heavy data URLs,
+      // automatically adequate every base64 image on an offscreen canvas to keep total payload safely around ~150-300 KB.
+      let payloadString = JSON.stringify(cleanData);
+      let payloadBytes = new Blob([payloadString]).size;
+
+      if (payloadBytes > 550 * 1024) {
+        console.log(`[Auto-Adequacy] Otimizando imagens pesadas automaticamente (${(payloadBytes / 1024).toFixed(0)} KB)...`);
+        const { updatedData, savedKb } = await autoAdequateAllMediaKitImages(cleanData);
+        cleanData = updatedData;
+        payloadString = JSON.stringify(cleanData);
+        payloadBytes = new Blob([payloadString]).size;
+        console.log(`[Auto-Adequacy] Concluído! Economia de ${savedKb} KB. Novo tamanho total: ${(payloadBytes / 1024).toFixed(0)} KB`);
+      }
+
+      if (payloadBytes > 950 * 1024) {
+        // Second pass if still unexpectedly high (e.g. dozens of images)
+        const { updatedData } = await autoAdequateAllMediaKitImages(cleanData);
+        cleanData = updatedData;
+        payloadString = JSON.stringify(cleanData);
+        payloadBytes = new Blob([payloadString]).size;
+      }
+
       if (payloadBytes > 950 * 1024) {
         throw new Error(
-          `O tamanho total das informações (${(payloadBytes / 1024).toFixed(0)} KB) ultrapassa o limite permitido pelo Firestore (1 MB). Reduza a resolução dos arquivos de logos inseridos.`
+          `O tamanho total das informações (${(payloadBytes / 1024).toFixed(0)} KB) ainda ultrapassa o limite permitido pelo Firestore (1 MB). Por favor, reduza a quantidade ou remova imagens excedentes.`
         );
       }
 

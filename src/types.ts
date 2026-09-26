@@ -24,6 +24,9 @@ export interface BrandPartner {
   campaignType?: string; // ex: 'Embaixadora Oficial', 'Campanha Reels', 'Lançamento', 'Publi Exclusiva'
   websiteUrl?: string; // Link da marca ou da campanha
   imageFit?: 'cover' | 'contain'; // 'cover' (campanha / foto editorial) ou 'contain' (logo vetor / com fundo transparente)
+  imageAlignment?: string; // ex: '50% 20%', '50% 50%', etc.
+  imageZoom?: number; // ex: 100 a 160%
+  imageResolution?: '1600p' | '1200p' | '800p' | 'original'; // perfil de resolução
 }
 
 export interface PartnershipFormat {

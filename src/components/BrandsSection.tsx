@@ -7,8 +7,23 @@ interface BrandsSectionProps {
   onOpenContactModal: () => void;
 }
 
-// Helper to ensure crystal-clear retina resolution for Unsplash and external images
-const getHighResImageUrl = (url?: string): string => {
+// Helper to ensure crystal-clear retina resolution for Unsplash and static assets
+const BRAND_STATIC_HIGH_RES: Record<string, string> = {
+  'brand-1': '/brand-images/brand-1.webp',
+  'brand-2': '/brand-images/brand-2.webp',
+  'brand-3': '/brand-images/brand-3.webp',
+  'brand-4': '/brand-images/brand-4.webp',
+  'brand-5': '/brand-images/brand-5.webp',
+  'brand-7': '/brand-images/brand-6.webp',
+};
+
+const getHighResImageUrl = (url?: string, brandId?: string): string => {
+  if (brandId && BRAND_STATIC_HIGH_RES[brandId]) {
+    // If url is empty or is an old low-res base64 string, seamlessly use the 1200px Retina WebP asset
+    if (!url || url.startsWith('data:image/jpeg') || url.startsWith('data:image/png')) {
+      return BRAND_STATIC_HIGH_RES[brandId];
+    }
+  }
   if (!url) return '';
   if (url.includes('images.unsplash.com')) {
     let enhanced = url;
@@ -148,7 +163,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               .toUpperCase();
 
             const isContain = brand.imageFit === 'contain';
-            const highResUrl = getHighResImageUrl(brand.logoUrl);
+            const highResUrl = getHighResImageUrl(brand.logoUrl, brand.id);
             const isUnsplash = Boolean(brand.logoUrl && brand.logoUrl.includes('images.unsplash.com'));
 
             return (
@@ -158,7 +173,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               >
                 {/* Modern Editorial Campaign & Logo Showcase Frame */}
                 <div
-                  className={`relative w-full h-48 sm:h-56 rounded-2xl overflow-hidden mb-5 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none ${
+                  className={`relative w-full h-52 sm:h-60 rounded-2xl overflow-hidden mb-5 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none ${
                     isContain
                       ? 'bg-white border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
                       : 'bg-[#F4EFEA] border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
@@ -203,16 +218,17 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
                       alt={`Campanha ou marca ${brand.name}`}
                       onError={() => handleImageError(brand.logoUrl)}
-                      className={`relative z-10 w-full h-full transition-transform duration-500 ease-out group-hover:scale-103 ${
+                      className={`relative z-10 w-full h-full transition-transform duration-500 ease-out group-hover:scale-102 will-change-transform ${
                         isContain
                           ? 'object-contain p-6 sm:p-7'
-                          : 'object-cover object-center'
+                          : 'object-cover'
                       }`}
                       style={{
-                        imageRendering: 'auto',
+                        objectPosition: brand.imageAlignment || (isContain ? 'center center' : 'center 22%'),
+                        transform: brand.imageZoom && brand.imageZoom !== 100 ? `scale(${brand.imageZoom / 100}) translateZ(0)` : 'translateZ(0)',
+                        imageRendering: '-webkit-optimize-contrast',
                         WebkitBackfaceVisibility: 'hidden',
                         backfaceVisibility: 'hidden',
-                        transform: 'translateZ(0)',
                       }}
                       loading="lazy"
                       decoding="async"
@@ -355,11 +371,11 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
 
             <div className="relative rounded-2xl overflow-hidden max-h-[60vh] bg-black/40 flex items-center justify-center border border-white/10 p-2">
               <img
-                src={getHighResImageUrl(previewBrand.logoUrl)}
+                src={getHighResImageUrl(previewBrand.logoUrl, previewBrand.id)}
                 alt={previewBrand.name}
                 className="w-full max-h-[58vh] object-contain rounded-xl"
                 style={{
-                  imageRendering: 'auto',
+                  imageRendering: '-webkit-optimize-contrast',
                   WebkitBackfaceVisibility: 'hidden',
                 }}
               />

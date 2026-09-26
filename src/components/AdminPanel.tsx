@@ -25,9 +25,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Cloud,
+  Zap,
 } from 'lucide-react';
 import { MediaKitData, SegmentItem } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { autoAdequateAllMediaKitImages, calculatePayloadSizeKb } from '../utils/imageOptimizer';
 import { ImageUploadField } from './ImageUploadField';
 import { AdminBrandsEditor } from './AdminBrandsEditor';
 import { AdminPartnershipFormatsEditor } from './AdminPartnershipFormatsEditor';
@@ -94,6 +97,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('creator');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAutoAdequating, setIsAutoAdequating] = useState(false);
+  const [autoAdequateMessage, setAutoAdequateMessage] = useState<string | null>(null);
 
   // Auth form states
   const [emailInput, setEmailInput] = useState('');
@@ -222,15 +227,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleAutoAdequateAll = async () => {
+    setIsAutoAdequating(true);
+    setAutoAdequateMessage(null);
+    setErrorMessage(null);
+    try {
+      const beforeKb = calculatePayloadSizeKb(formData);
+      const { updatedData, savedKb } = await autoAdequateAllMediaKitImages(formData);
+      setFormData(updatedData);
+      setIsDirty(true);
+      const afterKb = calculatePayloadSizeKb(updatedData);
+      if (savedKb > 0) {
+        setAutoAdequateMessage(`Imagens adequadas com sucesso! Redução de ${beforeKb} KB para ${afterKb} KB (${savedKb} KB economizados).`);
+      } else {
+        setAutoAdequateMessage(`Todas as imagens já estão 100% compactas e otimizadas (${afterKb} KB).`);
+      }
+      setTimeout(() => setAutoAdequateMessage(null), 5000);
+    } catch (err: any) {
+      console.error('Erro na auto-adequação:', err);
+      setErrorMessage('Não foi possível auto-adequar as imagens automaticamente.');
+    } finally {
+      setIsAutoAdequating(false);
+    }
+  };
+
   const handleSave = async () => {
     setErrorMessage(null);
-    const success = await onSave(formData);
-    if (success) {
+    let success = await onSave(formData);
+    if (!success) {
+      // Auto-remediation: attempt automatic adequacy pass on formData and retry
+      console.log('[Auto-Remediation] Tentando auto-adequar imagens para salvar sem erros...');
+      try {
+        const { updatedData } = await autoAdequateAllMediaKitImages(formData);
+        setFormData(updatedData);
+        success = await onSave(updatedData);
+        if (success) {
+          setIsDirty(false);
+          setSavedSuccess(true);
+          setTimeout(() => setSavedSuccess(false), 3500);
+          return;
+        }
+      } catch (e) {
+        console.error('Erro no retry de auto-adequação:', e);
+      }
+      setErrorMessage(
+        'Falha ao salvar no banco de dados. Verifique a conexão com a internet ou utilize o botão "Auto-Adequar Imagens".'
+      );
+    } else {
       setIsDirty(false);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3500);
-    } else {
-      setErrorMessage('Falha ao salvar no banco de dados. Verifique a conexão ou se o tamanho das imagens excede os limites.');
     }
   };
 
@@ -1280,6 +1326,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Restaurar Padrão</span>
               </button>
 
+              {/* Cloud Storage Gauge & Auto-Adequacy Action */}
+              <div
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs border transition-all ${
+                  calculatePayloadSizeKb(formData) > 550
+                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-white border-[#7B4B2A]/20 text-[#4A2E1F]'
+                }`}
+                title="Tamanho total das informações no Firestore (limite de 1.000 KB)"
+              >
+                <Cloud className={`w-3.5 h-3.5 ${calculatePayloadSizeKb(formData) > 550 ? 'text-amber-600' : 'text-[#B8860B]'}`} />
+                <span>
+                  Nuvem: <strong>{calculatePayloadSizeKb(formData)} KB</strong> / 1.000 KB
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAutoAdequateAll}
+                  disabled={isAutoAdequating}
+                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#FAF7F2] hover:bg-[#F5EFE9] text-[#4A2E1F] border border-[#7B4B2A]/20 cursor-pointer disabled:opacity-50"
+                  title="Adequar e converter automaticamente todas as fotos para o padrão WebP ultra-leve"
+                >
+                  <Sparkles className={`w-3 h-3 text-[#D4AF37] ${isAutoAdequating ? 'animate-spin' : ''}`} />
+                  <span>{isAutoAdequating ? 'Adequando...' : 'Auto-Adequar'}</span>
+                </button>
+              </div>
+
+              {autoAdequateMessage && (
+                <div className="inline-flex items-center gap-1.5 text-xs text-emerald-800 font-semibold animate-fadeIn bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{autoAdequateMessage}</span>
+                </div>
+              )}
+
               {savedSuccess && (
                 <div className="inline-flex items-center gap-1.5 text-xs text-green-700 font-semibold animate-fadeIn bg-green-50 px-2.5 py-1 rounded-lg border border-green-200">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -1288,9 +1366,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               )}
 
               {errorMessage && (
-                <div className="inline-flex items-center gap-1.5 text-xs text-red-600 font-semibold animate-fadeIn bg-red-50 px-2.5 py-1 rounded-lg border border-red-200">
+                <div className="inline-flex items-center gap-1.5 text-xs text-red-600 font-semibold animate-fadeIn bg-red-50 px-2.5 py-1 rounded-lg border border-red-200 flex-wrap">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleAutoAdequateAll();
+                      await handleSave();
+                    }}
+                    className="ml-1 underline text-red-800 font-bold hover:text-red-950 cursor-pointer"
+                  >
+                    Auto-Adequar e Salvar Agora
+                  </button>
                 </div>
               )}
             </div>

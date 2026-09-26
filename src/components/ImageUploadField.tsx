@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
 import {
   Upload,
   Link as LinkIcon,
@@ -101,6 +102,48 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
   const [isUrlMode, setIsUrlMode] = useState(false);
   const [isPositionOpen, setIsPositionOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedResolution, setSelectedResolution] = useState<number>(maxDimension || 800);
+  const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [enhanceSuccess, setEnhanceSuccess] = useState<string | null>(null);
+  const [autoAdequacyFeedback, setAutoAdequacyFeedback] = useState<{
+    originalKb: number;
+    optimizedKb: number;
+    reduction: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!value) {
+      setImgDimensions(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      setImgDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = value;
+  }, [value]);
+
+  const handleEnhanceResolution = async () => {
+    if (!value) return;
+    setIsProcessing(true);
+    setEnhanceSuccess(null);
+    try {
+      const res = await autoOptimizeDataUrl(value, {
+        maxDimension: selectedResolution,
+        targetMaxKb: 65,
+        preferredQuality: 0.84,
+      });
+      onChange(res.dataUrl);
+      setImgDimensions({ width: res.width, height: res.height });
+      setEnhanceSuccess(`Resolução otimizada para ${res.width} × ${res.height} px (${res.optimizedSizeKb} KB)!`);
+      setTimeout(() => setEnhanceSuccess(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage('Falha ao otimizar resolução.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Position coordinates in percentage (0 - 100)
   const defaultY = aspectRatio === 'portrait' ? 20 : 50;
@@ -146,11 +189,21 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
     setErrorMessage(null);
     setIsProcessing(true);
     try {
-      const optimizedBase64 = await compressImageFile(file, maxDimension);
-      onChange(optimizedBase64);
-    } catch (err) {
+      const res = await autoOptimizeImageFile(file, {
+        maxDimension: Math.min(selectedResolution, 800),
+        targetMaxKb: 60,
+        preferredQuality: 0.82,
+      });
+      onChange(res.dataUrl);
+      setAutoAdequacyFeedback({
+        originalKb: res.originalSizeKb,
+        optimizedKb: res.optimizedSizeKb,
+        reduction: res.reductionPercentage,
+      });
+      setTimeout(() => setAutoAdequacyFeedback(null), 6000);
+    } catch (err: any) {
       console.error(err);
-      setErrorMessage('Erro ao processar imagem.');
+      setErrorMessage('Erro ao adequar e processar a imagem.');
     } finally {
       setIsProcessing(false);
     }
@@ -293,6 +346,16 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Auto Adequacy Success Feedback */}
+      {autoAdequacyFeedback && (
+        <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-[11px] text-emerald-900 font-semibold animate-fadeIn shadow-2xs">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span>
+            Imagem adequada automaticamente: <strong>{autoAdequacyFeedback.originalKb} KB ➔ {autoAdequacyFeedback.optimizedKb} KB</strong> ({autoAdequacyFeedback.reduction}% menor, 100% segura para nuvem).
+          </span>
         </div>
       )}
 
@@ -497,6 +560,63 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
                 className="w-full h-1.5 bg-[#ECE2D8] rounded-lg appearance-none cursor-pointer accent-[#7B4B2A]"
               />
             </div>
+          </div>
+
+          {/* Resolution & Quality Control */}
+          <div className="space-y-2 pt-2 border-t border-[#7B4B2A]/15">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-[#7B4B2A] tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#B8860B]" />
+                <span>3. Resolução & Nitidez:</span>
+              </span>
+              {imgDimensions && (
+                <span className="font-mono text-[10px] text-[#4A2E1F] font-bold bg-[#FAF7F2] px-1.5 py-0.2 rounded border border-[#7B4B2A]/15">
+                  {imgDimensions.width} × {imgDimensions.height} px
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { label: '1600px (4K)', val: 1600 },
+                { label: '1200px (HD)', val: 1200 },
+                { label: '800px (Web)', val: 800 },
+              ].map((res) => (
+                <button
+                  key={res.val}
+                  type="button"
+                  onClick={() => setSelectedResolution(res.val)}
+                  className={`py-1 px-1.5 text-[10px] font-semibold rounded-md border text-center transition-all cursor-pointer ${
+                    selectedResolution === res.val
+                      ? 'bg-[#4A2E1F] text-white border-[#4A2E1F]'
+                      : 'bg-white text-[#7B4B2A] border-[#7B4B2A]/20 hover:bg-[#FAF7F2]'
+                  }`}
+                >
+                  {res.label}
+                </button>
+              ))}
+            </div>
+
+            {value && (
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={handleEnhanceResolution}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold text-white bg-[#7B4B2A] hover:bg-[#4A2E1F] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className={`w-3 h-3 text-[#D4AF37] ${isProcessing ? 'animate-spin' : ''}`} />
+                  <span>{isProcessing ? 'Otimizando...' : 'Otimizar Resolução Agora'}</span>
+                </button>
+
+                {enhanceSuccess && (
+                  <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>{enhanceSuccess}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Reset / Confirm */}
