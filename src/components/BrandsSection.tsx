@@ -19,8 +19,8 @@ const BRAND_STATIC_HIGH_RES: Record<string, string> = {
 
 const getHighResImageUrl = (url?: string, brandId?: string): string => {
   if (brandId && BRAND_STATIC_HIGH_RES[brandId]) {
-    // If url is empty or is an old low-res base64 string, seamlessly use the 1200px Retina WebP asset
-    if (!url || url.startsWith('data:image/jpeg') || url.startsWith('data:image/png')) {
+    // If url is empty or has a data URI for default curated brands, use the 1200px Retina WebP master file
+    if (!url || url === '/brand-images/brand-1.webp' || url.startsWith('data:')) {
       return BRAND_STATIC_HIGH_RES[brandId];
     }
   }
@@ -28,14 +28,14 @@ const getHighResImageUrl = (url?: string, brandId?: string): string => {
   if (url.includes('images.unsplash.com')) {
     let enhanced = url;
     if (enhanced.includes('w=')) {
-      enhanced = enhanced.replace(/w=\d+/, 'w=1200');
+      enhanced = enhanced.replace(/w=\d+/, 'w=1400');
     } else {
-      enhanced += '&w=1200';
+      enhanced += '&w=1400';
     }
     if (enhanced.includes('q=')) {
-      enhanced = enhanced.replace(/q=\d+/, 'q=90');
+      enhanced = enhanced.replace(/q=\d+/, 'q=92');
     } else {
-      enhanced += '&q=90';
+      enhanced += '&q=92';
     }
     return enhanced;
   }
@@ -369,14 +369,15 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               </button>
             </div>
 
-            <div className="relative rounded-2xl overflow-hidden max-h-[60vh] bg-black/40 flex items-center justify-center border border-white/10 p-2">
+            <div className="relative rounded-2xl overflow-hidden max-h-[65vh] bg-[#140D09]/80 flex items-center justify-center border border-white/10 p-2 sm:p-4">
               <img
                 src={getHighResImageUrl(previewBrand.logoUrl, previewBrand.id)}
                 alt={previewBrand.name}
-                className="w-full max-h-[58vh] object-contain rounded-xl"
+                className="w-auto h-auto max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl select-none"
                 style={{
-                  imageRendering: '-webkit-optimize-contrast',
+                  imageRendering: 'auto',
                   WebkitBackfaceVisibility: 'hidden',
+                  transform: 'translateZ(0)',
                 }}
               />
             </div>
