@@ -23,6 +23,7 @@ export interface BrandPartner {
   category?: string; // ex: 'Cachos & Cuidados Capilares', 'Dermocosméticos', 'Fitness & Suplementos', 'Moda & Calçados'
   campaignType?: string; // ex: 'Embaixadora Oficial', 'Campanha Reels', 'Lançamento', 'Publi Exclusiva'
   websiteUrl?: string; // Link da marca ou da campanha
+  imageFit?: 'cover' | 'contain'; // 'cover' (campanha / foto editorial) ou 'contain' (logo vetor / com fundo transparente)
 }
 
 export interface PartnershipFormat {

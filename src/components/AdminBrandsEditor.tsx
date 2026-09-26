@@ -92,9 +92,8 @@ const readLogoFile = (file: File): Promise<{ dataUrl: string; sizeKb: number }> 
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        // Max dimension of 260px provides pristine Retina clarity on public cards
-        // while maintaining payload around ~12-25 KB
-        const maxDimension = 260;
+        // High definition dimension of 1200px provides pristine Retina and 4K clarity on public cards and modal zoom
+        const maxDimension = 1200;
         let width = img.width;
         let height = img.height;
 
@@ -126,9 +125,9 @@ const readLogoFile = (file: File): Promise<{ dataUrl: string; sizeKb: number }> 
         if (isPng) {
           dataUrl = canvas.toDataURL('image/png');
         } else if (isWebp) {
-          dataUrl = canvas.toDataURL('image/webp', 0.88);
+          dataUrl = canvas.toDataURL('image/webp', 0.90);
         } else {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          dataUrl = canvas.toDataURL('image/jpeg', 0.90);
         }
 
         const sizeKb = Math.round(dataUrl.length / 1024);
@@ -701,7 +700,43 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
                           )}
 
                           <div className="text-[11px] text-[#7B4B2A]/80 leading-tight">
-                            Dica: Você também pode arrastar e soltar um arquivo de logo diretamente sobre a caixa acima.
+                            Dica: Você também pode arrastar e soltar um arquivo de imagem diretamente sobre a caixa acima.
+                          </div>
+
+                          {/* Visual Framing Control */}
+                          <div className="pt-2 border-t border-[#7B4B2A]/15 mt-2">
+                            <label className="block text-xs font-semibold text-[#7B4B2A] mb-1.5">
+                              Enquadramento no Card do Mídia Kit
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateBrand(brand.id, { imageFit: 'cover' })}
+                                className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  brand.imageFit !== 'contain'
+                                    ? 'bg-[#4A2E1F] text-[#FAF7F2] border-[#4A2E1F] shadow-2xs font-bold'
+                                    : 'bg-white border-[#7B4B2A]/20 text-[#7B4B2A] hover:bg-[#FAF7F2]'
+                                }`}
+                              >
+                                <span>Quadro Editorial (Foto / Ensaio)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateBrand(brand.id, { imageFit: 'contain' })}
+                                className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  brand.imageFit === 'contain'
+                                    ? 'bg-[#4A2E1F] text-[#FAF7F2] border-[#4A2E1F] shadow-2xs font-bold'
+                                    : 'bg-white border-[#7B4B2A]/20 text-[#7B4B2A] hover:bg-[#FAF7F2]'
+                                }`}
+                              >
+                                <span>Logo Centralizado (Vetor / Fundo Transparente)</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-[#7B4B2A]/70 mt-1">
+                              {brand.imageFit === 'contain'
+                                ? '• Exibição contida e centralizada: ideal para logos isolados com fundo transparente ou PNGs.'
+                                : '• Exibição editorial de alta elegância: preenche o quadro com efeito revista e desfoque ambiental de fundo, perfeito para fotos reais de campanha e produtos.'}
+                            </p>
                           </div>
                         </div>
                       </div>

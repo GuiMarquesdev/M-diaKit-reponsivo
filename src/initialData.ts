@@ -113,7 +113,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'active',
       category: 'Cachos & Capilar',
       campaignType: 'Embaixadora & Rotina Real',
-      logoUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.salonline.com.br',
     },
     {
@@ -122,7 +122,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'active',
       category: 'Dermocosméticos',
       campaignType: 'Rotina de Skincare Sem Filtro',
-      logoUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.principiaskincare.com.br',
     },
     {
@@ -131,7 +131,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'past',
       category: 'Beleza & Tratamento',
       campaignType: 'Lançamento Linha Glycolic Gloss',
-      logoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.loreal-paris.com.br',
     },
     {
@@ -140,7 +140,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'active',
       category: 'Fitness & Nutrição',
       campaignType: 'Cupom Oficial & Hábitos Saudáveis',
-      logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.gsuplementos.com.br',
     },
     {
@@ -149,7 +149,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'past',
       category: 'Tratamento Salon',
       campaignType: 'Transformação & Cronograma Capilar',
-      logoUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.wella.com',
     },
     {
@@ -158,7 +158,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'past',
       category: 'Moda & Calçados',
       campaignType: 'Coleção Alto Verão & Styling',
-      logoUrl: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.schutz.com.br',
     },
     {
@@ -167,7 +167,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'active',
       category: 'Clean Beauty',
       campaignType: 'Autocuidado & Beleza Limpa',
-      logoUrl: 'https://images.unsplash.com/photo-1608248597359-009581895a62?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1608248597359-009581895a62?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://simpleorganic.com.br',
     },
     {
@@ -176,7 +176,7 @@ export const initialMediaKitData: MediaKitData = {
       status: 'past',
       category: 'Maquiagem & Cores',
       campaignType: 'Make do Dia a Dia & Unhas',
-      logoUrl: 'https://images.unsplash.com/photo-1583241800698-e8ab01830a07?auto=format&fit=crop&w=400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1583241800698-e8ab01830a07?auto=format&fit=crop&w=1200&q=90',
       websiteUrl: 'https://www.dailus.com.br',
     },
   ],
