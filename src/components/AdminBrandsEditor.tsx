@@ -51,12 +51,12 @@ const PRESET_CAMPAIGNS = [
   'Contrato Semestral',
 ];
 
-// Compress and convert file using smart auto-optimizer (keeps under 55 KB per image, pristine WebP)
+// Compress and convert file using smart auto-optimizer (keeps under 85 KB per image, pristine 1080p WebP)
 const readLogoFile = async (file: File) => {
   return autoOptimizeImageFile(file, {
-    maxDimension: 800,
-    targetMaxKb: 55,
-    preferredQuality: 0.82,
+    maxDimension: 1080,
+    targetMaxKb: 85,
+    preferredQuality: 0.88,
   });
 };
 
@@ -132,11 +132,11 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
         const b = updatedBrands[i];
         if (b.logoUrl && (b.logoUrl.startsWith('data:') || b.logoUrl.startsWith('blob:'))) {
           const rawKb = Math.round((b.logoUrl.length * 0.75) / 1024);
-          if (rawKb > 55 || !b.logoUrl.startsWith('data:image/webp')) {
+          if (rawKb > 80 || !b.logoUrl.startsWith('data:image/webp')) {
             const res = await autoOptimizeDataUrl(b.logoUrl, {
-              maxDimension: 800,
-              targetMaxKb: 50,
-              preferredQuality: 0.80,
+              maxDimension: 1080,
+              targetMaxKb: 85,
+              preferredQuality: 0.86,
               originalSizeKb: rawKb,
             });
             updatedBrands[i] = { ...b, logoUrl: res.dataUrl };

@@ -20,10 +20,27 @@ const BRAND_HIGH_RES_MAP: Record<string, string> = {
 const normalizeBrands = (brands: any[]) => {
   if (!Array.isArray(brands)) return brands;
   return brands.map((b) => {
-    // If the brand still holds an old pixelated low-res data URI or outdated url, upgrade to pristine high-res webp
-    if (b && b.id && BRAND_HIGH_RES_MAP[b.id]) {
-      if (!b.logoUrl || b.logoUrl.startsWith('data:image/jpeg') || b.logoUrl.startsWith('data:image/png')) {
-        return { ...b, logoUrl: BRAND_HIGH_RES_MAP[b.id] };
+    if (!b) return b;
+    // Map by id or by name to always ensure pristine, crystal clear resolution
+    const matchedAsset =
+      BRAND_HIGH_RES_MAP[b.id] ||
+      (b.name === 'Forever Liss' ? '/brand-images/brand-1.webp' : null) ||
+      (b.name === 'L’Oréal Paris' || b.name === "L'Oreal Paris" ? '/brand-images/brand-2.webp' : null) ||
+      (b.name === 'TopWay' ? '/brand-images/brand-3.webp' : null) ||
+      (b.name === 'Haskell' ? '/brand-images/brand-4.webp' : null) ||
+      (b.name === 'Red Bull' ? '/brand-images/brand-5.webp' : null) ||
+      (b.name?.includes('Look de Hoje') ? '/brand-images/brand-6.webp' : null);
+
+    if (matchedAsset) {
+      // If the brand currently holds a low-res data URI or was saved as an older compressed data URL,
+      // restore the native 1200px Retina WebP file so it never looks pixelated or compressed
+      if (
+        !b.logoUrl ||
+        b.logoUrl.startsWith('data:') ||
+        b.logoUrl.includes('blob:') ||
+        b.logoUrl.includes('unsplash')
+      ) {
+        return { ...b, logoUrl: matchedAsset };
       }
     }
     return b;

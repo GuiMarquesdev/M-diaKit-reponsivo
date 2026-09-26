@@ -91,11 +91,11 @@ export const BrandImageTuner: React.FC<BrandImageTunerProps> = ({ brand, onUpdat
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const targetDim = resolutionProfile === '1600p' ? 1000 : resolutionProfile === '800p' ? 650 : 800;
+      const targetDim = resolutionProfile === '1600p' ? 1400 : resolutionProfile === '800p' ? 800 : 1080;
       const res = await autoOptimizeDataUrl(brand.logoUrl, {
         maxDimension: targetDim,
-        targetMaxKb: 60,
-        preferredQuality: 0.83,
+        targetMaxKb: 90,
+        preferredQuality: 0.88,
       });
 
       onUpdate({
@@ -104,7 +104,7 @@ export const BrandImageTuner: React.FC<BrandImageTunerProps> = ({ brand, onUpdat
       });
 
       setImgNaturalSize({ width: res.width, height: res.height });
-      setEnhancementSuccess(`Resolução aprimorada com sucesso para ${res.width} × ${res.height} px (${res.optimizedSizeKb} KB, WebP HD)!`);
+      setEnhancementSuccess(`Resolução aprimorada com sucesso para ${res.width} × ${res.height} px (${res.optimizedSizeKb} KB, WebP HD Ultra)!`);
       setTimeout(() => setEnhancementSuccess(null), 4500);
     } catch (err: any) {
       console.error('Falha ao aprimorar resolução:', err);
@@ -293,7 +293,7 @@ export const BrandImageTuner: React.FC<BrandImageTunerProps> = ({ brand, onUpdat
                   style={{
                     objectPosition: `${posX}% ${posY}%`,
                     transform: isContain ? 'none' : `scale(${zoomLevel / 100})`,
-                    imageRendering: '-webkit-optimize-contrast',
+                    imageRendering: 'auto',
                   }}
                 />
 

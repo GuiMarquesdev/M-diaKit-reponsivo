@@ -9,21 +9,31 @@ interface BrandsSectionProps {
 
 // Helper to ensure crystal-clear retina resolution for Unsplash and static assets
 const BRAND_STATIC_HIGH_RES: Record<string, string> = {
-  'brand-1': '/brand-images/brand-1.webp',
-  'brand-2': '/brand-images/brand-2.webp',
-  'brand-3': '/brand-images/brand-3.webp',
-  'brand-4': '/brand-images/brand-4.webp',
-  'brand-5': '/brand-images/brand-5.webp',
-  'brand-7': '/brand-images/brand-6.webp',
+  'brand-1': '/brand-images/brand-1.webp?v=1080p_r3',
+  'brand-2': '/brand-images/brand-2.webp?v=1080p_r3',
+  'brand-3': '/brand-images/brand-3.webp?v=1080p_r3',
+  'brand-4': '/brand-images/brand-4.webp?v=1080p_r3',
+  'brand-5': '/brand-images/brand-5.webp?v=1080p_r3',
+  'brand-7': '/brand-images/brand-6.webp?v=1080p_r3',
 };
 
-const getHighResImageUrl = (url?: string, brandId?: string): string => {
-  if (brandId && BRAND_STATIC_HIGH_RES[brandId]) {
-    // If url is empty or has a data URI for default curated brands, use the 1200px Retina WebP master file
-    if (!url || url === '/brand-images/brand-1.webp' || url.startsWith('data:')) {
-      return BRAND_STATIC_HIGH_RES[brandId];
+const getHighResImageUrl = (url?: string, brandId?: string, brandName?: string): string => {
+  const staticMatch =
+    (brandId && BRAND_STATIC_HIGH_RES[brandId]) ||
+    (brandName === 'Forever Liss' ? '/brand-images/brand-1.webp?v=1080p_r3' : null) ||
+    (brandName === 'L’Oréal Paris' || brandName === "L'Oreal Paris" ? '/brand-images/brand-2.webp?v=1080p_r3' : null) ||
+    (brandName === 'TopWay' ? '/brand-images/brand-3.webp?v=1080p_r3' : null) ||
+    (brandName === 'Haskell' ? '/brand-images/brand-4.webp?v=1080p_r3' : null) ||
+    (brandName === 'Red Bull' ? '/brand-images/brand-5.webp?v=1080p_r3' : null) ||
+    (brandName?.includes('Look de Hoje') ? '/brand-images/brand-6.webp?v=1080p_r3' : null);
+
+  if (staticMatch) {
+    // If the image is a data URI, local relative path or low-res placeholder, ALWAYS serve the crystal clear 1080p master asset
+    if (!url || url.startsWith('data:') || url.startsWith('/brand-images/') || url.includes('unsplash') || url === staticMatch) {
+      return staticMatch;
     }
   }
+
   if (!url) return '';
   if (url.includes('images.unsplash.com')) {
     let enhanced = url;
@@ -151,7 +161,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           {filteredBrands.map((brand) => {
             const hasImageFailed = !brand.logoUrl || failedImages[brand.logoUrl];
             const initials = brand.name
@@ -163,17 +173,17 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               .toUpperCase();
 
             const isContain = brand.imageFit === 'contain';
-            const highResUrl = getHighResImageUrl(brand.logoUrl, brand.id);
+            const highResUrl = getHighResImageUrl(brand.logoUrl, brand.id, brand.name);
             const isUnsplash = Boolean(brand.logoUrl && brand.logoUrl.includes('images.unsplash.com'));
 
             return (
               <div
                 key={brand.id}
-                className="group relative bg-[#FAF7F2] rounded-3xl p-5 sm:p-6 border border-[#7B4B2A]/20 hover:border-[#D4AF37] transition-all duration-300 warm-shadow flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-lg"
+                className="group relative bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#7B4B2A]/20 hover:border-[#D4AF37] transition-all duration-300 warm-shadow flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-lg"
               >
-                {/* Modern Editorial Campaign & Logo Showcase Frame */}
+                {/* Modern Editorial Campaign & Logo Showcase Frame - Compact size for ultra crisp 1080p density */}
                 <div
-                  className={`relative w-full h-52 sm:h-60 rounded-2xl overflow-hidden mb-5 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none ${
+                  className={`relative w-full h-44 sm:h-48 rounded-xl overflow-hidden mb-4 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none ${
                     isContain
                       ? 'bg-white border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
                       : 'bg-[#F4EFEA] border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
@@ -226,7 +236,7 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                       style={{
                         objectPosition: brand.imageAlignment || (isContain ? 'center center' : 'center 22%'),
                         transform: brand.imageZoom && brand.imageZoom !== 100 ? `scale(${brand.imageZoom / 100}) translateZ(0)` : 'translateZ(0)',
-                        imageRendering: '-webkit-optimize-contrast',
+                        imageRendering: 'auto',
                         WebkitBackfaceVisibility: 'hidden',
                         backfaceVisibility: 'hidden',
                       }}
@@ -328,33 +338,33 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
         </button>
       </div>
 
-      {/* Lightbox Modal for Full Campaign Shoot Preview */}
+      {/* Lightbox Modal for Full Campaign Shoot Preview - Sized compactly for maximum 1080p pixel density */}
       {previewBrand && (
         <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5"
           onClick={() => setPreviewBrand(null)}
         >
           <div
-            className="relative max-w-3xl w-full bg-[#1C120C] border border-[#D4AF37]/50 rounded-3xl overflow-hidden shadow-2xl p-4 sm:p-6 text-white space-y-4 animate-in fade-in zoom-in-95 duration-200"
+            className="relative max-w-xl w-full bg-[#1C120C] border border-[#D4AF37]/50 rounded-2xl overflow-hidden shadow-2xl p-4 sm:p-5 text-white space-y-3.5 animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#FAF7F2]">
+                  <h3 className="font-serif text-lg sm:text-xl font-bold text-[#FAF7F2]">
                     {previewBrand.name}
                   </h3>
                   {previewBrand.status === 'active' ? (
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/40">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/40">
                       Parceria Ativa
                     </span>
                   ) : (
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#FAF7F2]/10 text-[#D4AF37] border border-[#D4AF37]/40">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FAF7F2]/10 text-[#D4AF37] border border-[#D4AF37]/40">
                       Campanha Entregue
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[#D4AF37] mt-0.5">
+                <p className="text-[11px] text-[#D4AF37] mt-0.5">
                   {previewBrand.category} • {previewBrand.campaignType}
                 </p>
               </div>
@@ -362,18 +372,18 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setPreviewBrand(null)}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors"
                 title="Fechar visualização"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="relative rounded-2xl overflow-hidden max-h-[65vh] bg-[#140D09]/80 flex items-center justify-center border border-white/10 p-2 sm:p-4">
+            <div className="relative rounded-xl overflow-hidden max-h-[50vh] bg-[#140D09]/90 flex items-center justify-center border border-white/10 p-2 sm:p-3">
               <img
-                src={getHighResImageUrl(previewBrand.logoUrl, previewBrand.id)}
+                src={getHighResImageUrl(previewBrand.logoUrl, previewBrand.id, previewBrand.name)}
                 alt={previewBrand.name}
-                className="w-auto h-auto max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl select-none"
+                className="w-auto h-auto max-w-full max-h-[46vh] object-contain rounded-lg shadow-xl select-none"
                 style={{
                   imageRendering: 'auto',
                   WebkitBackfaceVisibility: 'hidden',
