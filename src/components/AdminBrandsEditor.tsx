@@ -587,19 +587,23 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
                       </div>
                     </div>
 
-                    {/* Fifth Row: Logo Management with Drag-and-Drop & Optimization */}
+                    {/* Fifth Row: Logo or Campaign Photo Management with Drag-and-Drop */}
                     <div className="p-4 bg-[#FAF7F2] border border-[#7B4B2A]/20 rounded-2xl space-y-3">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-[#2C1810] flex items-center gap-1.5">
                           <ImageIcon className="w-3.5 h-3.5 text-[#B8860B]" />
-                          <span>Logo da Marca (Imagem ou Link)</span>
+                          <span>Foto da Campanha / Logo da Marca (Arquivo Original de Alta Resolução)</span>
                         </label>
                         {brand.logoUrl && (
                           <span className="text-[11px] text-emerald-800 font-semibold flex items-center gap-1">
                             <Check className="w-3 h-3 text-emerald-600" />
-                            <span>Logo configurada</span>
+                            <span>Imagem configurada</span>
                           </span>
                         )}
+                      </div>
+
+                      <div className="text-[11px] text-[#7B4B2A] leading-relaxed bg-[#FAF7F2] border border-[#D4AF37]/30 p-2.5 rounded-xl">
+                        💡 <strong>Para máxima nitidez sem pixelização:</strong> selecione a foto original ou logo em alta resolução (JPG, PNG ou WEBP). O sistema converterá automaticamente para 1080p Full HD preservando os detalhes originais.
                       </div>
 
                       {/* Dropzone & Preview */}

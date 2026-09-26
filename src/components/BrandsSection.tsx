@@ -7,49 +7,51 @@ interface BrandsSectionProps {
   onOpenContactModal: () => void;
 }
 
-// Helper to ensure crystal-clear retina resolution for Unsplash and static assets
-const BRAND_STATIC_HIGH_RES: Record<string, string> = {
-  'brand-1': '/brand-images/brand-1.webp?v=1080p_r3',
-  'brand-2': '/brand-images/brand-2.webp?v=1080p_r3',
-  'brand-3': '/brand-images/brand-3.webp?v=1080p_r3',
-  'brand-4': '/brand-images/brand-4.webp?v=1080p_r3',
-  'brand-5': '/brand-images/brand-5.webp?v=1080p_r3',
-  'brand-7': '/brand-images/brand-6.webp?v=1080p_r3',
+// Helper to generate modern picture sources with 1x, 2x, 3x HiDPI srcset
+interface BrandSourceSet {
+  avifSrcSet?: string;
+  webpSrcSet: string;
+  fallbackUrl: string;
+}
+
+const getBrandPictureSources = (url?: string, brandId?: string, brandName?: string): BrandSourceSet => {
+  // Determine if this is one of our static brand assets (brand-1 to brand-6)
+  let staticIndex = '';
+  if (brandId === 'brand-1' || brandName === 'Forever Liss') staticIndex = '1';
+  else if (brandId === 'brand-2' || brandName === 'L’Oréal Paris' || brandName === "L'Oreal Paris") staticIndex = '2';
+  else if (brandId === 'brand-3' || brandName === 'TopWay') staticIndex = '3';
+  else if (brandId === 'brand-4' || brandName === 'Haskell') staticIndex = '4';
+  else if (brandId === 'brand-5' || brandName === 'Red Bull') staticIndex = '5';
+  else if (brandId === 'brand-7' || brandName?.includes('Look de Hoje')) staticIndex = '6';
+
+  if (staticIndex) {
+    const v = '1080p_r4';
+    return {
+      avifSrcSet: `/brand-images/brand-${staticIndex}.avif?v=${v} 1x, /brand-images/brand-${staticIndex}.avif?v=${v} 2x`,
+      webpSrcSet: `/brand-images/brand-${staticIndex}_1x.webp?v=${v} 1x, /brand-images/brand-${staticIndex}_2x.webp?v=${v} 2x, /brand-images/brand-${staticIndex}_3x.webp?v=${v} 3x`,
+      fallbackUrl: `/brand-images/brand-${staticIndex}.webp?v=${v}`,
+    };
+  }
+
+  // Unsplash images support dynamic retina srcset
+  if (url && url.includes('images.unsplash.com')) {
+    const cleanUrl = url.split('&w=')[0].split('?w=')[0];
+    const baseParams = cleanUrl.includes('?') ? cleanUrl : `${cleanUrl}?auto=format&fit=crop`;
+    return {
+      webpSrcSet: `${baseParams}&w=450&q=85 1x, ${baseParams}&w=900&q=90 2x, ${baseParams}&w=1400&q=95 3x`,
+      fallbackUrl: `${baseParams}&w=900&q=90`,
+    };
+  }
+
+  const fallback = url || '';
+  return {
+    webpSrcSet: `${fallback} 1x`,
+    fallbackUrl: fallback,
+  };
 };
 
 const getHighResImageUrl = (url?: string, brandId?: string, brandName?: string): string => {
-  const staticMatch =
-    (brandId && BRAND_STATIC_HIGH_RES[brandId]) ||
-    (brandName === 'Forever Liss' ? '/brand-images/brand-1.webp?v=1080p_r3' : null) ||
-    (brandName === 'L’Oréal Paris' || brandName === "L'Oreal Paris" ? '/brand-images/brand-2.webp?v=1080p_r3' : null) ||
-    (brandName === 'TopWay' ? '/brand-images/brand-3.webp?v=1080p_r3' : null) ||
-    (brandName === 'Haskell' ? '/brand-images/brand-4.webp?v=1080p_r3' : null) ||
-    (brandName === 'Red Bull' ? '/brand-images/brand-5.webp?v=1080p_r3' : null) ||
-    (brandName?.includes('Look de Hoje') ? '/brand-images/brand-6.webp?v=1080p_r3' : null);
-
-  if (staticMatch) {
-    // If the image is a data URI, local relative path or low-res placeholder, ALWAYS serve the crystal clear 1080p master asset
-    if (!url || url.startsWith('data:') || url.startsWith('/brand-images/') || url.includes('unsplash') || url === staticMatch) {
-      return staticMatch;
-    }
-  }
-
-  if (!url) return '';
-  if (url.includes('images.unsplash.com')) {
-    let enhanced = url;
-    if (enhanced.includes('w=')) {
-      enhanced = enhanced.replace(/w=\d+/, 'w=1400');
-    } else {
-      enhanced += '&w=1400';
-    }
-    if (enhanced.includes('q=')) {
-      enhanced = enhanced.replace(/q=\d+/, 'q=92');
-    } else {
-      enhanced += '&q=92';
-    }
-    return enhanced;
-  }
-  return url;
+  return getBrandPictureSources(url, brandId, brandName).fallbackUrl;
 };
 
 export const BrandsSection: React.FC<BrandsSectionProps> = ({
@@ -173,17 +175,16 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               .toUpperCase();
 
             const isContain = brand.imageFit === 'contain';
-            const highResUrl = getHighResImageUrl(brand.logoUrl, brand.id, brand.name);
-            const isUnsplash = Boolean(brand.logoUrl && brand.logoUrl.includes('images.unsplash.com'));
+            const brandSources = getBrandPictureSources(brand.logoUrl, brand.id, brand.name);
 
             return (
               <div
                 key={brand.id}
                 className="group relative bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#7B4B2A]/20 hover:border-[#D4AF37] transition-all duration-300 warm-shadow flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-lg"
               >
-                {/* Modern Editorial Campaign & Logo Showcase Frame - Compact size for ultra crisp 1080p density */}
+                {/* Modern Editorial Campaign & Logo Showcase Frame - Fluid Responsive Aspect Ratio Without Stretching */}
                 <div
-                  className={`relative w-full h-44 sm:h-48 rounded-xl overflow-hidden mb-4 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none ${
+                  className={`relative w-full h-44 sm:h-48 rounded-xl overflow-hidden mb-4 transition-all duration-300 shadow-xs group-hover:shadow-md cursor-pointer select-none flex items-center justify-center ${
                     isContain
                       ? 'bg-white border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
                       : 'bg-[#F4EFEA] border border-[#7B4B2A]/15 group-hover:border-[#D4AF37]'
@@ -216,33 +217,35 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
                     </span>
                   </div>
 
-                  {/* Main Image Showcase */}
+                  {/* High-Resolution Picture Element with AVIF + WebP and HiDPI srcset */}
                   {!hasImageFailed ? (
-                    <img
-                      src={highResUrl}
-                      srcSet={
-                        isUnsplash
-                          ? `${brand.logoUrl.replace(/w=\d+/, 'w=600')} 600w, ${highResUrl} 1200w, ${brand.logoUrl.replace(/w=\d+/, 'w=1600')} 1600w`
-                          : undefined
-                      }
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
-                      alt={`Campanha ou marca ${brand.name}`}
-                      onError={() => handleImageError(brand.logoUrl)}
-                      className={`relative z-10 w-full h-full transition-transform duration-500 ease-out group-hover:scale-102 will-change-transform ${
-                        isContain
-                          ? 'object-contain p-6 sm:p-7'
-                          : 'object-cover'
-                      }`}
-                      style={{
-                        objectPosition: brand.imageAlignment || (isContain ? 'center center' : 'center 22%'),
-                        transform: brand.imageZoom && brand.imageZoom !== 100 ? `scale(${brand.imageZoom / 100}) translateZ(0)` : 'translateZ(0)',
-                        imageRendering: 'auto',
-                        WebkitBackfaceVisibility: 'hidden',
-                        backfaceVisibility: 'hidden',
-                      }}
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    <picture className="relative z-10 w-full h-full flex items-center justify-center overflow-hidden">
+                      {brandSources.avifSrcSet && (
+                        <source type="image/avif" srcSet={brandSources.avifSrcSet} />
+                      )}
+                      {brandSources.webpSrcSet && (
+                        <source type="image/webp" srcSet={brandSources.webpSrcSet} />
+                      )}
+                      <img
+                        src={brandSources.fallbackUrl}
+                        alt={`Campanha ou marca ${brand.name}`}
+                        onError={() => handleImageError(brand.logoUrl)}
+                        className={`transition-transform duration-500 ease-out group-hover:scale-102 will-change-transform crisp-img ${
+                          isContain
+                            ? 'max-w-full max-h-full w-auto h-auto object-contain p-6 sm:p-7'
+                            : 'w-full h-full max-w-full object-cover'
+                        }`}
+                        style={{
+                          objectPosition: brand.imageAlignment || (isContain ? 'center center' : 'center 22%'),
+                          transform: brand.imageZoom && brand.imageZoom !== 100 ? `scale(${brand.imageZoom / 100}) translateZ(0)` : 'translateZ(0)',
+                          imageRendering: '-webkit-optimize-contrast',
+                          WebkitBackfaceVisibility: 'hidden',
+                          backfaceVisibility: 'hidden',
+                        }}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </picture>
                   ) : (
                     <div className="relative z-10 w-full h-full flex flex-col items-center justify-center text-center p-4 bg-[#FAF7F2]">
                       <div className="w-14 h-14 rounded-2xl bg-white border border-[#D4AF37]/50 flex items-center justify-center shadow-xs mb-2">
@@ -379,17 +382,31 @@ export const BrandsSection: React.FC<BrandsSectionProps> = ({
               </button>
             </div>
 
-            <div className="relative rounded-xl overflow-hidden max-h-[50vh] bg-[#140D09]/90 flex items-center justify-center border border-white/10 p-2 sm:p-3">
-              <img
-                src={getHighResImageUrl(previewBrand.logoUrl, previewBrand.id, previewBrand.name)}
-                alt={previewBrand.name}
-                className="w-auto h-auto max-w-full max-h-[46vh] object-contain rounded-lg shadow-xl select-none"
-                style={{
-                  imageRendering: 'auto',
-                  WebkitBackfaceVisibility: 'hidden',
-                  transform: 'translateZ(0)',
-                }}
-              />
+            <div className="relative rounded-xl overflow-hidden max-h-[60vh] bg-[#140D09]/95 flex items-center justify-center border border-white/10 p-2 sm:p-4">
+              {(() => {
+                const previewSources = getBrandPictureSources(previewBrand.logoUrl, previewBrand.id, previewBrand.name);
+                return (
+                  <picture className="flex items-center justify-center max-w-full max-h-[55vh]">
+                    {previewSources.avifSrcSet && (
+                      <source type="image/avif" srcSet={previewSources.avifSrcSet} />
+                    )}
+                    {previewSources.webpSrcSet && (
+                      <source type="image/webp" srcSet={previewSources.webpSrcSet} />
+                    )}
+                    <img
+                      src={previewSources.fallbackUrl}
+                      alt={previewBrand.name}
+                      className="w-auto h-auto max-w-full max-h-[52vh] object-contain rounded-lg shadow-2xl select-none crisp-img"
+                      style={{
+                        imageRendering: '-webkit-optimize-contrast',
+                        WebkitBackfaceVisibility: 'hidden',
+                        backfaceVisibility: 'hidden',
+                        transform: 'translateZ(0)',
+                      }}
+                    />
+                  </picture>
+                );
+              })()}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
