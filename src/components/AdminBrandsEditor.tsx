@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { BrandPartner } from '../types';
 import { BrandImageTuner } from './BrandImageTuner';
-import { optimizeAndUploadImage, optimizeAndUploadDataUrl } from '../utils/imageOptimizer';
+import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
 import {
   Plus,
   Trash2,
@@ -51,12 +51,12 @@ const PRESET_CAMPAIGNS = [
   'Contrato Semestral',
 ];
 
-// Otimiza em alta qualidade e envia o logo como arquivo de verdade pro Firebase Storage
-const readLogoFile = async (brandId: string, file: File) => {
-  const path = `mediakit/brands/${brandId}-${Date.now()}.webp`;
-  return optimizeAndUploadImage(file, path, {
-    maxDimension: 1600,
-    quality: 0.92,
+// Compress and convert file using smart auto-optimizer (keeps under 85 KB per image, pristine 1080p WebP)
+const readLogoFile = async (file: File) => {
+  return autoOptimizeImageFile(file, {
+    maxDimension: 1080,
+    targetMaxKb: 85,
+    preferredQuality: 0.88,
   });
 };
 
@@ -72,8 +72,8 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
   const [uploadSuccess, setUploadSuccess] = useState<{
     id: string;
     sizeKb: number;
-    width?: number;
-    height?: number;
+    originalKb?: number;
+    reduction?: number;
   } | null>(null);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [isBatchOptimizing, setIsBatchOptimizing] = useState(false);
@@ -119,36 +119,42 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
     onChange(updated);
   };
 
-  // Migra logos antigos (ainda em base64 dentro do documento) pro Firebase Storage em alta resolução
+  // Automated one-click batch adequacy of all existing brands
   const handleAutoAdequateAllBrands = async () => {
     setIsBatchOptimizing(true);
     setBatchSuccessMessage(null);
     try {
       let count = 0;
+      let totalSavedKb = 0;
       const updatedBrands = [...brands];
 
       for (let i = 0; i < updatedBrands.length; i++) {
         const b = updatedBrands[i];
         if (b.logoUrl && (b.logoUrl.startsWith('data:') || b.logoUrl.startsWith('blob:'))) {
-          const path = `mediakit/brands/${b.id}-${Date.now()}.webp`;
-          const res = await optimizeAndUploadDataUrl(b.logoUrl, path, {
-            maxDimension: 1600,
-            quality: 0.92,
-          });
-          updatedBrands[i] = { ...b, logoUrl: res.url };
-          count++;
+          const rawKb = Math.round((b.logoUrl.length * 0.75) / 1024);
+          if (rawKb > 80 || !b.logoUrl.startsWith('data:image/webp')) {
+            const res = await autoOptimizeDataUrl(b.logoUrl, {
+              maxDimension: 1080,
+              targetMaxKb: 85,
+              preferredQuality: 0.86,
+              originalSizeKb: rawKb,
+            });
+            updatedBrands[i] = { ...b, logoUrl: res.dataUrl };
+            count++;
+            totalSavedKb += Math.max(0, rawKb - res.optimizedSizeKb);
+          }
         }
       }
 
       onChange(updatedBrands);
       if (count > 0) {
-        setBatchSuccessMessage(`Sucesso! ${count} logos migrados para o Storage em alta resolução.`);
+        setBatchSuccessMessage(`Sucesso! ${count} marcas foram adequadas automaticamente (economia de ${totalSavedKb} KB).`);
       } else {
-        setBatchSuccessMessage('Todos os logos já estão no Storage em alta resolução!');
+        setBatchSuccessMessage('Todas as marcas já estão 100% adequadas e otimizadas para a nuvem!');
       }
       setTimeout(() => setBatchSuccessMessage(null), 5000);
     } catch (err: any) {
-      console.error('Falha na migração em lote:', err);
+      console.error('Falha na adequação em lote:', err);
     } finally {
       setIsBatchOptimizing(false);
     }
@@ -157,18 +163,18 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
   const processFile = async (brandId: string, file: File) => {
     setUploadError(null);
     try {
-      const res = await readLogoFile(brandId, file);
-      handleUpdateBrand(brandId, { logoUrl: res.url });
+      const res = await readLogoFile(file);
+      handleUpdateBrand(brandId, { logoUrl: res.dataUrl });
       setUploadSuccess({
         id: brandId,
-        sizeKb: res.sizeKb,
-        width: res.width,
-        height: res.height,
+        sizeKb: res.optimizedSizeKb,
+        originalKb: res.originalSizeKb,
+        reduction: res.reductionPercentage,
       });
       setTimeout(() => setUploadSuccess(null), 6000);
     } catch (err: any) {
       console.error('Erro ao processar imagem de logo:', err);
-      setUploadError({ id: brandId, message: err?.message || 'Falha ao processar e enviar a imagem.' });
+      setUploadError({ id: brandId, message: err?.message || 'Falha ao processar e adequar a imagem.' });
       setTimeout(() => setUploadError(null), 5000);
     }
   };
@@ -232,10 +238,10 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
             onClick={handleAutoAdequateAllBrands}
             disabled={isBatchOptimizing}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#4A2E1F] bg-white hover:bg-[#FAF7F2] border border-[#D4AF37]/60 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Migrar logos antigos (salvos dentro do documento) para o Storage em alta resolução"
+            title="Adequar e converter automaticamente todas as fotos para o padrão leve WebP"
           >
             <Sparkles className={`w-3.5 h-3.5 text-[#B8860B] ${isBatchOptimizing ? 'animate-spin' : ''}`} />
-            <span>{isBatchOptimizing ? 'Migrando Imagens...' : 'Migrar Logos Antigos p/ Alta Resolução'}</span>
+            <span>{isBatchOptimizing ? 'Adequando Imagens...' : 'Auto-Adequar Todas as Imagens'}</span>
           </button>
 
           {onSaveDirect && (
@@ -677,7 +683,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
                             <div className="flex items-center gap-2 text-[11px] text-emerald-900 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-300 animate-fadeIn">
                               <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               <span>
-                                Imagem enviada em alta resolução{uploadSuccess.width ? ` (${uploadSuccess.width} × ${uploadSuccess.height}px` : ''}{uploadSuccess.width ? `, ${uploadSuccess.sizeKb} KB)` : ` (${uploadSuccess.sizeKb} KB)`} — pronta para salvar!
+                                Imagem adequada automaticamente: <strong>{uploadSuccess.originalKb ? `${uploadSuccess.originalKb} KB ➔ ` : ''}{uploadSuccess.sizeKb} KB</strong> {uploadSuccess.reduction ? `(${uploadSuccess.reduction}% menor, 100% segura para nuvem)` : 'pronta para salvar!'}
                               </span>
                             </div>
                           )}

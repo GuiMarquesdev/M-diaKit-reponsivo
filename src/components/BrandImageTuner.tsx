@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { optimizeAndUploadDataUrl } from '../utils/imageOptimizer';
+import { autoOptimizeDataUrl } from '../utils/imageOptimizer';
 import {
   Sliders,
   Sparkles,
@@ -91,20 +91,20 @@ export const BrandImageTuner: React.FC<BrandImageTunerProps> = ({ brand, onUpdat
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const targetDim = resolutionProfile === '1600p' ? 1600 : resolutionProfile === '800p' ? 800 : 1200;
-      const path = `mediakit/brands/${brand.id}-${Date.now()}.webp`;
-      const res = await optimizeAndUploadDataUrl(brand.logoUrl, path, {
+      const targetDim = resolutionProfile === '1600p' ? 1400 : resolutionProfile === '800p' ? 800 : 1080;
+      const res = await autoOptimizeDataUrl(brand.logoUrl, {
         maxDimension: targetDim,
-        quality: 0.93,
+        targetMaxKb: 90,
+        preferredQuality: 0.88,
       });
 
       onUpdate({
-        logoUrl: res.url,
+        logoUrl: res.dataUrl,
         imageResolution: resolutionProfile,
       });
 
       setImgNaturalSize({ width: res.width, height: res.height });
-      setEnhancementSuccess(`Resolução aprimorada com sucesso para ${res.width} × ${res.height} px (${res.sizeKb} KB, WebP HD Ultra)!`);
+      setEnhancementSuccess(`Resolução aprimorada com sucesso para ${res.width} × ${res.height} px (${res.optimizedSizeKb} KB, WebP HD Ultra)!`);
       setTimeout(() => setEnhancementSuccess(null), 4500);
     } catch (err: any) {
       console.error('Falha ao aprimorar resolução:', err);
