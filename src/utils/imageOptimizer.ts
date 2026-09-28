@@ -5,6 +5,9 @@
  * Ensures crystal-clear retina definition (up to 1080px) while maintaining total payload sizes safely within Firestore limits.
  */
 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
+
 export interface OptimizedImageResult {
   dataUrl: string;
   originalSizeKb: number;
@@ -72,6 +75,103 @@ const drawDownscaledImage = (
   finalCtx.drawImage(curCanvas, 0, 0, targetWidth, targetHeight);
 
   return finalCanvas;
+};
+
+export interface UploadedImageResult {
+  url: string;
+  width: number;
+  height: number;
+  sizeKb: number;
+}
+
+/**
+ * Otimiza um arquivo de imagem em alta qualidade e envia como arquivo de
+ * verdade para o Firebase Storage, retornando a URL publica de download.
+ *
+ * Diferente do autoOptimizeImageFile/autoOptimizeDataUrl (que miram um KB
+ * alvo pequeno pra caber a imagem inteira, em base64, dentro de um unico
+ * documento do Firestore - limitado a 1MB), aqui a imagem fica como um
+ * arquivo proprio no Storage e o documento so guarda a URL (poucos bytes).
+ * Isso permite resolucao e qualidade bem mais altas sem risco de estourar
+ * o limite do documento, e sem precisar recomprimir imagens ja otimizadas
+ * toda vez que o mediakit cresce.
+ */
+export const optimizeAndUploadImage = async (
+  file: File,
+  storagePath: string,
+  options?: { maxDimension?: number; quality?: number }
+): Promise<UploadedImageResult> => {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo selecionado.'));
+    reader.readAsDataURL(file);
+  });
+  return optimizeAndUploadDataUrl(dataUrl, storagePath, options);
+};
+
+/**
+ * Mesma coisa que optimizeAndUploadImage, mas a partir de uma imagem que ja
+ * esta em memoria (data: URL) - usado para migrar logos/fotos antigas que
+ * ainda estao guardadas em base64 dentro do documento do Firestore.
+ * Se a URL ja for um link (http/https) e nao um data: URL, retorna como esta
+ * (ja deve ser um arquivo no Storage ou uma URL externa, nao ha o que migrar).
+ */
+export const optimizeAndUploadDataUrl = async (
+  dataUrl: string,
+  storagePath: string,
+  options?: { maxDimension?: number; quality?: number }
+): Promise<UploadedImageResult> => {
+  const maxDim = options?.maxDimension || 1600;
+  const quality = options?.quality ?? 0.92;
+
+  if (!dataUrl.startsWith('data:') && !dataUrl.startsWith('blob:')) {
+    return { url: dataUrl, width: 0, height: 0, sizeKb: 0 };
+  }
+
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Não foi possível ler a imagem selecionada.'));
+    img.src = dataUrl;
+  });
+
+  const origW = img.naturalWidth || img.width;
+  const origH = img.naturalHeight || img.height;
+  let width = origW;
+  let height = origH;
+  if (width > height) {
+    if (width > maxDim) {
+      height = Math.round((height * maxDim) / width);
+      width = maxDim;
+    }
+  } else {
+    if (height > maxDim) {
+      width = Math.round((width * maxDim) / height);
+      height = maxDim;
+    }
+  }
+
+  const canvas = drawDownscaledImage(img, origW, origH, Math.max(1, width), Math.max(1, height));
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('Falha ao gerar o arquivo final da imagem.'))),
+      'image/webp',
+      quality
+    );
+  });
+
+  const storageRef = ref(storage, storagePath);
+  await uploadBytes(storageRef, blob, { contentType: 'image/webp' });
+  const url = await getDownloadURL(storageRef);
+
+  return {
+    url,
+    width: canvas.width,
+    height: canvas.height,
+    sizeKb: Math.round(blob.size / 1024),
+  };
 };
 
 /**

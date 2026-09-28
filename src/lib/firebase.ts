@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, setLogLevel } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -13,6 +14,10 @@ setLogLevel('error');
 
 // Initialize Firestore with explicit databaseId as prescribed by Firebase guidelines
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+
+// Storage: guarda as imagens como arquivos de verdade (fora do documento do
+// Firestore), permitindo resolucao alta sem pressionar o limite de 1MB por documento.
+export const storage = getStorage(app);
 
 export default app;
 

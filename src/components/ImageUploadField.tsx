@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
+import { optimizeAndUploadImage, optimizeAndUploadDataUrl } from '../utils/imageOptimizer';
 import {
   Upload,
   Link as LinkIcon,
@@ -106,9 +106,7 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
   const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
   const [enhanceSuccess, setEnhanceSuccess] = useState<string | null>(null);
   const [autoAdequacyFeedback, setAutoAdequacyFeedback] = useState<{
-    originalKb: number;
     optimizedKb: number;
-    reduction: number;
   } | null>(null);
 
   useEffect(() => {
@@ -128,14 +126,14 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
     setIsProcessing(true);
     setEnhanceSuccess(null);
     try {
-      const res = await autoOptimizeDataUrl(value, {
+      const path = `mediakit/creator/${id || 'foto'}-${Date.now()}.webp`;
+      const res = await optimizeAndUploadDataUrl(value, path, {
         maxDimension: selectedResolution,
-        targetMaxKb: 65,
-        preferredQuality: 0.84,
+        quality: 0.92,
       });
-      onChange(res.dataUrl);
+      onChange(res.url);
       setImgDimensions({ width: res.width, height: res.height });
-      setEnhanceSuccess(`Resolução otimizada para ${res.width} × ${res.height} px (${res.optimizedSizeKb} KB)!`);
+      setEnhanceSuccess(`Resolução otimizada para ${res.width} × ${res.height} px (${res.sizeKb} KB)!`);
       setTimeout(() => setEnhanceSuccess(null), 4000);
     } catch (err: any) {
       console.error(err);
@@ -189,21 +187,18 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
     setErrorMessage(null);
     setIsProcessing(true);
     try {
-      const res = await autoOptimizeImageFile(file, {
-        maxDimension: Math.min(selectedResolution, 800),
-        targetMaxKb: 60,
-        preferredQuality: 0.82,
+      const path = `mediakit/creator/${id || 'foto'}-${Date.now()}.webp`;
+      const res = await optimizeAndUploadImage(file, path, {
+        maxDimension: selectedResolution,
+        quality: 0.92,
       });
-      onChange(res.dataUrl);
-      setAutoAdequacyFeedback({
-        originalKb: res.originalSizeKb,
-        optimizedKb: res.optimizedSizeKb,
-        reduction: res.reductionPercentage,
-      });
+      onChange(res.url);
+      setImgDimensions({ width: res.width, height: res.height });
+      setAutoAdequacyFeedback({ optimizedKb: res.sizeKb });
       setTimeout(() => setAutoAdequacyFeedback(null), 6000);
     } catch (err: any) {
       console.error(err);
-      setErrorMessage('Erro ao adequar e processar a imagem.');
+      setErrorMessage('Erro ao enviar a imagem.');
     } finally {
       setIsProcessing(false);
     }
@@ -354,7 +349,7 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
         <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-[11px] text-emerald-900 font-semibold animate-fadeIn shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span>
-            Imagem adequada automaticamente: <strong>{autoAdequacyFeedback.originalKb} KB ➔ {autoAdequacyFeedback.optimizedKb} KB</strong> ({autoAdequacyFeedback.reduction}% menor, 100% segura para nuvem).
+            Imagem enviada em alta resolução: <strong>{autoAdequacyFeedback.optimizedKb} KB</strong> — pronta para salvar!
           </span>
         </div>
       )}
