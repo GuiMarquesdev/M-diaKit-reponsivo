@@ -2,8 +2,10 @@
  * Smart Image Optimization Pipeline for Media Kit
  * Automatically compresses, resizes, and converts uploaded images to high-efficiency WebP/PNG
  * with multi-step bicubic downsampling and subtle unsharp sharpening.
- * Ensures crystal-clear retina definition (up to 1080px) while maintaining total payload sizes safely within Firestore limits.
+ * Ensures crystal-clear retina definition while keeping files light enough for fast loading.
  */
+
+import { supabase, MEDIA_KIT_BUCKET } from '../lib/supabase';
 
 export interface OptimizedImageResult {
   dataUrl: string;
@@ -291,14 +293,15 @@ export const autoAdequateAllMediaKitImages = async (
     try {
       const raw = task.get();
       const rawKb = Math.round((raw.length * 0.75) / 1024);
-      // Só recomprime se estiver bem mais pesada do que o alvo de qualidade
-      // original (90 KB) - imagens que já vieram boas do upload não são
-      // tocadas de novo, evitando perda de qualidade a cada salvamento.
-      if (rawKb > 110 || !raw.startsWith('data:image/webp')) {
+      // Isto só existe para imagens antigas que ainda estão em base64 (herdadas
+      // do Firestore). Uploads novos vão direto para o Supabase Storage e nunca
+      // passam por aqui. Só recomprime se estiver bem mais pesada do que o
+      // alvo de qualidade, evitando perda de qualidade a cada salvamento.
+      if (rawKb > 250 || !raw.startsWith('data:image/webp')) {
         const res = await autoOptimizeDataUrl(raw, {
-          maxDimension: 1080,
-          targetMaxKb: 90,
-          preferredQuality: 0.86,
+          maxDimension: 1600,
+          targetMaxKb: 220,
+          preferredQuality: 0.9,
           originalSizeKb: rawKb,
         });
         task.set(res.dataUrl);
@@ -310,6 +313,47 @@ export const autoAdequateAllMediaKitImages = async (
   }
 
   return { updatedData: clone, savedKb };
+};
+
+const dataUrlToBlob = (dataUrl: string): Blob => {
+  const [header, base64] = dataUrl.split(',');
+  const mimeMatch = header.match(/data:([^;]+);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/webp';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+};
+
+/**
+ * Optimizes an image file on canvas (same pipeline as autoOptimizeImageFile) and uploads
+ * the resulting file to Supabase Storage instead of embedding it as base64. Returns the
+ * public URL to store in the media kit data — this is what keeps photos sharp without
+ * bloating the database payload.
+ */
+export const uploadOptimizedImageFile = async (
+  file: File,
+  folder: string,
+  options?: { maxDimension?: number; targetMaxKb?: number; preferredQuality?: number }
+): Promise<OptimizedImageResult & { url: string }> => {
+  const optimized = await autoOptimizeImageFile(file, {
+    maxDimension: options?.maxDimension || 1600,
+    targetMaxKb: options?.targetMaxKb || 220,
+    preferredQuality: options?.preferredQuality || 0.9,
+  });
+
+  const blob = dataUrlToBlob(optimized.dataUrl);
+  const ext = blob.type === 'image/webp' ? 'webp' : (blob.type.split('/')[1] || 'webp');
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage.from(MEDIA_KIT_BUCKET).upload(path, blob, {
+    contentType: blob.type,
+    upsert: false,
+  });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(MEDIA_KIT_BUCKET).getPublicUrl(path);
+  return { ...optimized, url: data.publicUrl };
 };
 
 /**

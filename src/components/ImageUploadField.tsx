@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
+import { autoOptimizeDataUrl, uploadOptimizedImageFile } from '../utils/imageOptimizer';
 import {
   Upload,
   Link as LinkIcon,
@@ -125,13 +125,18 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
 
   const handleEnhanceResolution = async () => {
     if (!value) return;
+    if (!value.startsWith('data:')) {
+      setEnhanceSuccess('Esta foto já está hospedada em alta resolução — envie um novo arquivo para trocá-la.');
+      setTimeout(() => setEnhanceSuccess(null), 4000);
+      return;
+    }
     setIsProcessing(true);
     setEnhanceSuccess(null);
     try {
       const res = await autoOptimizeDataUrl(value, {
         maxDimension: selectedResolution,
-        targetMaxKb: 90,
-        preferredQuality: 0.86,
+        targetMaxKb: 220,
+        preferredQuality: 0.9,
       });
       onChange(res.dataUrl);
       setImgDimensions({ width: res.width, height: res.height });
@@ -189,12 +194,12 @@ export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
     setErrorMessage(null);
     setIsProcessing(true);
     try {
-      const res = await autoOptimizeImageFile(file, {
+      const res = await uploadOptimizedImageFile(file, 'photos', {
         maxDimension: selectedResolution,
-        targetMaxKb: 90,
-        preferredQuality: 0.86,
+        targetMaxKb: 220,
+        preferredQuality: 0.9,
       });
-      onChange(res.dataUrl);
+      onChange(res.url);
       setAutoAdequacyFeedback({
         originalKb: res.originalSizeKb,
         optimizedKb: res.optimizedSizeKb,

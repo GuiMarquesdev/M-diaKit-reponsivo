@@ -1,15 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  User,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously,
-  signOut,
-  onAuthStateChanged,
-} from 'firebase/auth';
-import { collection, addDoc } from 'firebase/firestore';
-import { auth, googleProvider, db } from '../lib/firebase';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { CommercialLead } from '../types';
 
 export interface AppUser {
@@ -22,6 +13,9 @@ export interface AppUser {
   permissions?: string[];
 }
 
+// Mantido apenas para compatibilidade de tipos com a UI existente do painel.
+// O login real nunca gera um desafio de 2FA: a senha já é validada no
+// servidor do Supabase, então este objeto sempre fica com isPending: false.
 export interface TwoFaChallenge {
   isPending: boolean;
   challengeId: string | null;
@@ -33,7 +27,7 @@ export interface TwoFaChallenge {
 }
 
 interface AuthContextType {
-  user: AppUser | User | null;
+  user: AppUser | null;
   loading: boolean;
   twoFaChallenge: TwoFaChallenge;
   loginWithGoogle: () => Promise<void>;
@@ -47,333 +41,128 @@ interface AuthContextType {
   submitLead: (lead: Omit<CommercialLead, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string }>;
 }
 
+const NO_CHALLENGE: TwoFaChallenge = { isPending: false, challengeId: null, email: null };
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  twoFaChallenge: { isPending: false, challengeId: null, email: null },
+  twoFaChallenge: NO_CHALLENGE,
   loginWithGoogle: async () => {},
   loginWithEmail: async () => ({ requires2FA: false }),
   verify2FACode: async () => false,
   resend2FACode: async () => ({ success: false }),
+  fetchCurrent2FACode: async () => null,
   cancel2FA: () => {},
   registerWithEmail: async () => {},
   logout: async () => {},
   submitLead: async () => ({ success: false }),
 });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AppUser | User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [twoFaChallenge, setTwoFaChallenge] = useState<TwoFaChallenge>({
-    isPending: false,
-    challengeId: null,
-    email: null,
-  });
+const sessionToAppUser = (session: Session | null): AppUser | null => {
+  if (!session?.user) return null;
+  const { user: su } = session;
+  return {
+    uid: su.id,
+    email: su.email || null,
+    displayName: (su.user_metadata?.full_name as string) || 'Sophia Menezes',
+    photoURL: (su.user_metadata?.avatar_url as string) || null,
+    // Não há cadastro público (ver registerWithEmail abaixo): toda conta que
+    // existir no projeto Supabase foi criada manualmente pelo desenvolvedor
+    // no painel, então qualquer sessão válida aqui já é uma conta de admin.
+    role: 'ADMIN',
+    twoFactorEnabled: false,
+    permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_BRANDS', 'MANAGE_SETTINGS', 'MANAGE_USERS'],
+  };
+};
 
-  // Check local session storage, server session, and Firebase auth state
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     let isMounted = true;
 
-    function initSession() {
-      // 1. Check local session storage first (Instant offline/Vercel support)
-      try {
-        const cachedSession = localStorage.getItem('sophia_admin_session');
-        if (cachedSession) {
-          const parsed = JSON.parse(cachedSession);
-          if (parsed && parsed.email && isMounted) {
-            setUser(parsed);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Session parse error', e);
-      }
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setUser(sessionToAppUser(data.session));
+      setLoading(false);
+    });
 
-      // 2. Check client Firebase Auth
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        if (!isMounted) return;
-        if (currentUser) {
-          const u: AppUser = {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName || 'Sophia Menezes',
-            photoURL: currentUser.photoURL,
-            role: currentUser.email === 'sophiaamenezes10@gmail.com' || currentUser.email === 'guimarquesbrito@gmail.com' ? 'ADMIN' : 'EDITOR',
-            twoFactorEnabled: true,
-            permissions: ['EDIT_CONTENT', 'MANAGE_BRANDS', 'MANAGE_SETTINGS'],
-          };
-          setUser(u);
-          localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-        } else if (!localStorage.getItem('sophia_admin_session')) {
-          setUser(null);
-        }
-        setLoading(false);
-      });
-
-      return unsubscribe;
-    }
-
-    const unsub = initSession();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setUser(sessionToAppUser(session));
+    });
 
     return () => {
       isMounted = false;
-      if (typeof unsub === 'function') unsub();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
-  // Server-side login with Rate Limit, Password Hash check and 2FA Challenge (with seamless resilient fallback)
+  // Login real: a senha é validada pelo Supabase Auth no servidor.
+  // Nada de senha ou hash fica no código do site.
   const loginWithEmail = async (email: string, pass: string): Promise<{ requires2FA: boolean }> => {
-    let cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail.includes('@') && cleanEmail.length > 0) {
-      cleanEmail = `${cleanEmail}@gmail.com`;
-    }
-    const cleanPass = (pass || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: pass,
+    });
 
-    const isMasterAdminEmail =
-      cleanEmail === 'sophiaamenezes10@gmail.com' ||
-      cleanEmail === 'sophiamenezes10@gmail.com' ||
-      cleanEmail === 'guimarquesbrito@gmail.com' ||
-      cleanEmail.includes('sophia') ||
-      cleanEmail.includes('guimarques');
-
-    // 1. Validation for Master Admin credentials
-    const validPasswords = [
-      'Sophia@M10',
-      'sophia@m10',
-      'Euevoce10@',
-      'euevoce10@',
-      'Sophia@10',
-      'sophia@10',
-    ];
-
-    let isPasswordValid =
-      validPasswords.includes(cleanPass) ||
-      validPasswords.includes(pass) ||
-      cleanPass.toLowerCase() === 'sophia@m10' ||
-      cleanPass.toLowerCase() === 'euevoce10@';
-
-    // Also check SHA-256 hash if window.crypto.subtle is available
-    if (!isPasswordValid && typeof window !== 'undefined' && window.crypto?.subtle) {
-      try {
-        const encoder = new TextEncoder();
-        const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(cleanPass));
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-        // SHA-256 of "Sophia@M10" or "Euevoce10@"
-        isPasswordValid =
-          hashHex === '4e001643659d689e851f5aec278c55cdb062d8c21b47b3a103f722f969098d88' ||
-          hashHex === '4550aa84ba6896205cfce95a435868fcbc2c0e86fa6efd25622df14073d7ec1f';
-      } catch {
-        // Fallback already checked above
-      }
+    if (error || !data.session) {
+      throw new Error('Credenciais inválidas. Verifique seu e-mail e senha.');
     }
 
-    if (isMasterAdminEmail && isPasswordValid) {
-      const adminUser: AppUser = {
-        uid: cleanEmail.includes('guimarques') ? 'admin_guilherme' : 'admin_sophia',
-        email: cleanEmail,
-        displayName: cleanEmail.includes('guimarques') ? 'Guilherme Brito' : 'Sophia Menezes',
-        role: 'ADMIN',
-        twoFactorEnabled: true,
-        permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_BRANDS', 'MANAGE_SETTINGS', 'MANAGE_USERS'],
-      };
-      setUser(adminUser);
-      localStorage.setItem('sophia_admin_session', JSON.stringify(adminUser));
-      if (!auth.currentUser) {
-        signInAnonymously(auth).catch(() => {});
-      }
-      return { requires2FA: false };
-    }
-
-    // 2. Firebase Auth for other accounts
-    try {
-      const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-      if (res.user) {
-        const u: AppUser = {
-          uid: res.user.uid,
-          email: res.user.email,
-          displayName: res.user.displayName || 'Sophia Menezes',
-          role: 'ADMIN',
-          twoFactorEnabled: true,
-          permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_SETTINGS'],
-        };
-        setUser(u);
-        localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-        return { requires2FA: false };
-      }
-    } catch {
-      // Ignore firebase errors
-    }
-
-    throw new Error('Credenciais inválidas. Verifique seu e-mail e senha.');
+    setUser(sessionToAppUser(data.session));
+    return { requires2FA: false };
   };
 
-  // Verify 2FA code
-  const verify2FACode = async (code: string): Promise<boolean> => {
-    if (!twoFaChallenge.challengeId) {
-      throw new Error('Nenhum desafio de 2FA em andamento.');
-    }
-
-    const trimmed = code.trim();
-    if (twoFaChallenge.code && trimmed === twoFaChallenge.code) {
-      const email = twoFaChallenge.email || 'sophiaamenezes10@gmail.com';
-      const u: AppUser = {
-        uid: 'admin_2fa_verified',
-        email,
-        displayName: email === 'guimarquesbrito@gmail.com' ? 'Guilherme Brito' : 'Sophia Menezes',
-        role: 'ADMIN',
-        twoFactorEnabled: true,
-        permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_SETTINGS'],
-      };
-      setUser(u);
-      localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-      setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
-      return true;
-    }
-
-    try {
-      const res = await fetch('/api/auth/verify-2fa', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          challengeId: twoFaChallenge.challengeId,
-          code: trimmed,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.user) {
-          const u: AppUser = {
-            uid: data.user.userId,
-            email: data.user.email,
-            displayName: data.user.displayName,
-            role: data.user.role,
-            twoFactorEnabled: true,
-            permissions: data.user.permissions,
-          };
-          setUser(u);
-          localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-          setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
-          return true;
-        }
-      }
-    } catch {
-      // Continue to error
-    }
-
-    throw new Error('Código 2FA inválido ou expirado.');
-  };
-
-  const cancel2FA = () => {
-    setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
-  };
-
-  const resend2FACode = async (): Promise<{ success: boolean; message?: string }> => {
-    if (!twoFaChallenge.challengeId) {
-      throw new Error('Nenhum desafio de 2FA ativo.');
-    }
-
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setTwoFaChallenge((prev) => ({
-      ...prev,
-      code: newCode,
-    }));
-
-    return { success: true, message: 'Novo código de segurança gerado!' };
-  };
-
-  const fetchCurrent2FACode = async (): Promise<string | null> => {
-    return twoFaChallenge.code || null;
+  // Sem cadastro público: as únicas contas de admin são criadas manualmente
+  // pelo desenvolvedor no painel do Supabase. Isso evita que qualquer
+  // visitante que descubra a URL do admin crie a própria conta e vire admin.
+  const registerWithEmail = async (): Promise<void> => {
+    throw new Error(
+      'Cadastro de novos administradores está desabilitado. Peça ao desenvolvedor para criar seu acesso no painel do Supabase.'
+    );
   };
 
   const loginWithGoogle = async () => {
-    try {
-      const res = await signInWithPopup(auth, googleProvider);
-      if (res.user) {
-        const u: AppUser = {
-          uid: res.user.uid,
-          email: res.user.email,
-          displayName: res.user.displayName || 'Sophia Menezes',
-          photoURL: res.user.photoURL,
-          role: 'ADMIN',
-          twoFactorEnabled: true,
-          permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_SETTINGS'],
-        };
-        setUser(u);
-        localStorage.setItem('sophia_admin_session', JSON.stringify(u));
-        return;
-      }
-    } catch (err: any) {
-      if (
-        err?.code === 'auth/operation-not-allowed' ||
-        err?.code === 'auth/unauthorized-domain' ||
-        err?.code === 'auth/popup-closed-by-user' ||
-        err?.code === 'auth/cancelled-popup-request'
-      ) {
-        if (err?.code === 'auth/popup-closed-by-user') {
-          return;
-        }
-        const fallbackUser: AppUser = {
-          uid: 'google_admin_sophia',
-          email: 'sophiaamenezes10@gmail.com',
-          displayName: 'Sophia Menezes',
-          role: 'ADMIN',
-          twoFactorEnabled: true,
-          permissions: ['EDIT_CONTENT', 'MANAGE_LEADS', 'MANAGE_SETTINGS'],
-        };
-        setUser(fallbackUser);
-        localStorage.setItem('sophia_admin_session', JSON.stringify(fallbackUser));
-        return;
-      }
-      throw err;
-    }
-  };
-
-  const registerWithEmail = async (email: string, pass: string) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
-    if (res.user) {
-      const u: AppUser = {
-        uid: res.user.uid,
-        email: res.user.email,
-        displayName: res.user.displayName || 'Sophia Menezes',
-        role: 'ADMIN',
-        twoFactorEnabled: true,
-      };
-      setUser(u);
-      localStorage.setItem('sophia_admin_session', JSON.stringify(u));
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href },
+    });
+    if (error) {
+      throw new Error(
+        'Login com Google ainda não está configurado no Supabase deste projeto. Use e-mail e senha, ou peça ao desenvolvedor para habilitar o provedor Google.'
+      );
     }
   };
 
   const logout = async () => {
-    localStorage.removeItem('sophia_admin_session');
-    try {
-      await signOut(auth);
-    } catch {
-      // Ignore
-    }
-
+    await supabase.auth.signOut();
     setUser(null);
-    setTwoFaChallenge({ isPending: false, challengeId: null, email: null });
   };
 
-  // Submit Lead with direct Firestore persistence
+  // Compatibilidade: o fluxo de 2FA simulado foi removido (não era real —
+  // o código chegava a ser devolvido na própria resposta da API). O login
+  // com senha validada pelo Supabase já cobre a autenticação de verdade.
+  const verify2FACode = async (): Promise<boolean> => false;
+  const resend2FACode = async (): Promise<{ success: boolean; message?: string }> => ({ success: false });
+  const fetchCurrent2FACode = async (): Promise<string | null> => null;
+  const cancel2FA = () => {};
+
   const submitLead = async (
     lead: Omit<CommercialLead, 'id' | 'createdAt'>
   ): Promise<{ success: boolean; message?: string }> => {
-    try {
-      await addDoc(collection(db, 'leads'), {
-        ...lead,
-        createdAt: new Date().toISOString(),
-        status: 'new',
-      });
+    const { error } = await supabase.from('leads').insert({
+      name: lead.name,
+      email: lead.email,
+      brand: lead.brand,
+      budget: lead.budget,
+      message: lead.message,
+    });
 
-      return { success: true, message: 'Proposta comercial enviada com sucesso!' };
-    } catch (e: any) {
-      throw e;
-    }
+    if (error) throw error;
+    return { success: true, message: 'Proposta comercial enviada com sucesso!' };
   };
 
   return (
@@ -381,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
-        twoFaChallenge,
+        twoFaChallenge: NO_CHALLENGE,
         loginWithGoogle,
         loginWithEmail,
         verify2FACode,

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { initialMediaKitData } from '../initialData';
 import { MediaKitData } from '../types';
 import { OFFICIAL_SOCIAL_LINKS } from '../constants';
-import { autoAdequateAllMediaKitImages } from '../utils/imageOptimizer';
 
 const STORAGE_KEY = 'sophiamenezes_mediakit_data_cache_v3';
+const CONTENT_ROW_ID = 'main';
 
 const BRAND_HIGH_RES_MAP: Record<string, string> = {
   'brand-1': '/brand-images/brand-1.webp',
@@ -106,101 +105,69 @@ export function useMediaKitData() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let unsubscribe = () => {};
+    let cancelled = false;
 
-    try {
-      const docRef = doc(db, 'content', 'mediaKit');
+    (async () => {
+      try {
+        const { data: row, error: fetchError } = await supabase
+          .from('media_kit_content')
+          .select('data')
+          .eq('id', CONTENT_ROW_ID)
+          .maybeSingle();
 
-      // Realtime listener
-      unsubscribe = onSnapshot(
-        docRef,
-        (docSnap) => {
-          if (docSnap.exists()) {
-            const cloudData = docSnap.data() as MediaKitData;
-            normalizeSocialLinks(cloudData);
-            setData((prev) => ({
-              ...prev,
-              ...cloudData,
-              creator: { ...prev.creator, ...(cloudData.creator || {}) },
-              metrics: { ...prev.metrics, ...(cloudData.metrics || {}) },
-              instagram: { ...prev.instagram, ...(cloudData.instagram || {}) },
-              tiktok: { ...prev.tiktok, ...(cloudData.tiktok || {}) },
-              contact: { ...prev.contact, ...(cloudData.contact || {}) },
-              segments: Array.isArray(cloudData.segments) ? cloudData.segments : prev.segments,
-              brands: Array.isArray(cloudData.brands) ? cloudData.brands : prev.brands,
-              partnershipFormats: Array.isArray(cloudData.partnershipFormats) ? cloudData.partnershipFormats : prev.partnershipFormats,
-            }));
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
-            } catch (e) {
-              console.error('Failed to cache in localStorage:', e);
-            }
-          } else {
-            // Document doesn't exist yet on Firestore; fallback gracefully to initial data
-            setData(initialMediaKitData);
+        if (cancelled) return;
+        if (fetchError) throw fetchError;
+
+        if (row?.data) {
+          const cloudData = row.data as MediaKitData;
+          normalizeSocialLinks(cloudData);
+          setData((prev) => ({
+            ...prev,
+            ...cloudData,
+            creator: { ...prev.creator, ...(cloudData.creator || {}) },
+            metrics: { ...prev.metrics, ...(cloudData.metrics || {}) },
+            instagram: { ...prev.instagram, ...(cloudData.instagram || {}) },
+            tiktok: { ...prev.tiktok, ...(cloudData.tiktok || {}) },
+            contact: { ...prev.contact, ...(cloudData.contact || {}) },
+            segments: Array.isArray(cloudData.segments) ? cloudData.segments : prev.segments,
+            brands: Array.isArray(cloudData.brands) ? cloudData.brands : prev.brands,
+            partnershipFormats: Array.isArray(cloudData.partnershipFormats) ? cloudData.partnershipFormats : prev.partnershipFormats,
+          }));
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+          } catch (e) {
+            console.error('Failed to cache in localStorage:', e);
           }
-          setLoading(false);
-        },
-        (err) => {
-          console.warn('Firestore subscription notice:', err);
-          // If Firestore permission or network issue occurs, continue gracefully with local/cached data
-          setLoading(false);
         }
-      );
-    } catch (e: any) {
-      console.warn('Firestore initialize error:', e);
-      setLoading(false);
-    }
+      } catch (e) {
+        console.warn('Supabase load notice:', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const updateData = async (newData: MediaKitData): Promise<boolean> => {
     setSaving(true);
     setError(null);
     try {
-      // 1. Sanitize to prevent undefined values which break Firestore setDoc
-      let cleanData: MediaKitData = JSON.parse(
+      const cleanData: MediaKitData = JSON.parse(
         JSON.stringify(newData, (_, value) => (value === undefined ? null : value))
       );
 
-      // 2. Intelligent Auto-Adequacy Pipeline:
-      // If total payload size exceeds 550 KB or contains uncompressed heavy data URLs,
-      // automatically adequate every base64 image on an offscreen canvas to keep total payload safely around ~150-300 KB.
-      let payloadString = JSON.stringify(cleanData);
-      let payloadBytes = new Blob([payloadString]).size;
+      const { error: upsertError } = await supabase
+        .from('media_kit_content')
+        .upsert({ id: CONTENT_ROW_ID, data: cleanData, updated_at: new Date().toISOString() });
 
-      if (payloadBytes > 550 * 1024) {
-        console.log(`[Auto-Adequacy] Otimizando imagens pesadas automaticamente (${(payloadBytes / 1024).toFixed(0)} KB)...`);
-        const { updatedData, savedKb } = await autoAdequateAllMediaKitImages(cleanData);
-        cleanData = updatedData;
-        payloadString = JSON.stringify(cleanData);
-        payloadBytes = new Blob([payloadString]).size;
-        console.log(`[Auto-Adequacy] Concluído! Economia de ${savedKb} KB. Novo tamanho total: ${(payloadBytes / 1024).toFixed(0)} KB`);
-      }
+      if (upsertError) throw upsertError;
 
-      if (payloadBytes > 950 * 1024) {
-        // Second pass if still unexpectedly high (e.g. dozens of images)
-        const { updatedData } = await autoAdequateAllMediaKitImages(cleanData);
-        cleanData = updatedData;
-        payloadString = JSON.stringify(cleanData);
-        payloadBytes = new Blob([payloadString]).size;
-      }
-
-      if (payloadBytes > 950 * 1024) {
-        throw new Error(
-          `O tamanho total das informações (${(payloadBytes / 1024).toFixed(0)} KB) ainda ultrapassa o limite permitido pelo Firestore (1 MB). Por favor, reduza a quantidade ou remova imagens excedentes.`
-        );
-      }
-
-      // 3. Persist directly to Firestore
-      const docRef = doc(db, 'content', 'mediaKit');
-      await setDoc(docRef, cleanData, { merge: true });
-
-      // 4. Update local state and localStorage cache after cloud write confirmation
       setData(cleanData);
       try {
-        localStorage.setItem(STORAGE_KEY, payloadString);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
       } catch (e) {
         console.warn('LocalStorage cache update notice:', e);
       }
@@ -208,8 +175,8 @@ export function useMediaKitData() {
       setSaving(false);
       return true;
     } catch (err: any) {
-      console.error('Error saving media kit data to Firestore:', err);
-      const message = err?.message || 'Falha ao persistir alterações no Firestore.';
+      console.error('Error saving media kit data to Supabase:', err);
+      const message = err?.message || 'Falha ao persistir alterações no Supabase.';
       setError(message);
       setSaving(false);
       return false;

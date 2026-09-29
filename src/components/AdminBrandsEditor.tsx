@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { BrandPartner } from '../types';
 import { BrandImageTuner } from './BrandImageTuner';
-import { autoOptimizeImageFile, autoOptimizeDataUrl } from '../utils/imageOptimizer';
+import { autoOptimizeDataUrl, uploadOptimizedImageFile } from '../utils/imageOptimizer';
 import {
   Plus,
   Trash2,
@@ -51,12 +51,12 @@ const PRESET_CAMPAIGNS = [
   'Contrato Semestral',
 ];
 
-// Compress and convert file using smart auto-optimizer (keeps under 85 KB per image, pristine 1080p WebP)
+// Optimizes and uploads the logo/campaign photo to Supabase Storage (real file, not base64)
 const readLogoFile = async (file: File) => {
-  return autoOptimizeImageFile(file, {
-    maxDimension: 1080,
-    targetMaxKb: 85,
-    preferredQuality: 0.88,
+  return uploadOptimizedImageFile(file, 'brands', {
+    maxDimension: 1600,
+    targetMaxKb: 220,
+    preferredQuality: 0.9,
   });
 };
 
@@ -164,7 +164,7 @@ export const AdminBrandsEditor: React.FC<AdminBrandsEditorProps> = ({
     setUploadError(null);
     try {
       const res = await readLogoFile(file);
-      handleUpdateBrand(brandId, { logoUrl: res.dataUrl });
+      handleUpdateBrand(brandId, { logoUrl: res.url });
       setUploadSuccess({
         id: brandId,
         sizeKb: res.optimizedSizeKb,

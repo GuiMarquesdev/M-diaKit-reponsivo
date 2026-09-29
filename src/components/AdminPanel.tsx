@@ -17,8 +17,6 @@ import {
   ArrowLeft,
   Shield,
   Briefcase,
-  RefreshCw,
-  Check,
   Lock,
   Mail,
   Layers,
@@ -80,18 +78,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   saving,
   isPage = false,
 }) => {
-  const {
-    user,
-    loginWithGoogle,
-    loginWithEmail,
-    registerWithEmail,
-    logout,
-    twoFaChallenge,
-    verify2FACode,
-    resend2FACode,
-    fetchCurrent2FACode,
-    cancel2FA,
-  } = useAuth();
+  const { user, loginWithGoogle, loginWithEmail, logout } = useAuth();
   const [formData, setFormData] = useState<MediaKitData>(data);
   const [isDirty, setIsDirty] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('creator');
@@ -103,48 +90,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Auth form states
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
-
-  // 2FA challenge state
-  const [twoFaCodeInput, setTwoFaCodeInput] = useState('');
-  const [twoFaError, setTwoFaError] = useState<string | null>(null);
-  const [twoFaLoading, setTwoFaLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
-
-  // Reset 2FA input when a challenge begins
-  React.useEffect(() => {
-    if (twoFaChallenge.isPending) {
-      setTwoFaCodeInput('');
-      setTwoFaError(null);
-      setResendMessage(null);
-    }
-  }, [twoFaChallenge.isPending, twoFaChallenge.challengeId]);
-
-  // Handle countdown for resend button
-  React.useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setResendCooldown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCooldown]);
-
-  const handleResend2FA = async () => {
-    if (resendCooldown > 0) return;
-    try {
-      setTwoFaError(null);
-      setResendMessage('Enviando novo código...');
-      const res = await resend2FACode();
-      setResendMessage(res.message || 'Novo código enviado para seu e-mail.');
-      setResendCooldown(45);
-    } catch (err: any) {
-      setTwoFaError(err.message || 'Erro ao reenviar código.');
-      setResendMessage(null);
-    }
-  };
 
   // Sync state when data props change, avoiding clobbering in-flight user edits
   React.useEffect(() => {
@@ -176,42 +123,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAuthError(null);
     setAuthLoading(true);
     try {
-      if (isRegisterMode) {
-        await registerWithEmail(emailInput, passwordInput);
-      } else {
-        await loginWithEmail(emailInput, passwordInput);
-      }
+      await loginWithEmail(emailInput, passwordInput);
     } catch (err: any) {
       console.error('Auth error:', err);
-      let msg = 'Erro na autenticação.';
-      if (err.code === 'auth/weak-password') {
-        msg = 'A senha deve ter pelo menos 6 caracteres.';
-      } else if (err.code === 'auth/invalid-email') {
-        msg = 'E-mail inválido.';
-      } else if (err.code === 'auth/wrong-password') {
-        msg = 'Senha incorreta.';
-      } else if (err.message) {
-        msg = err.message;
-      }
-      setAuthError(msg);
+      setAuthError(err.message || 'Erro na autenticação.');
     } finally {
       setAuthLoading(false);
-    }
-  };
-
-  const handle2FASubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTwoFaError(null);
-    setTwoFaLoading(true);
-    try {
-      const success = await verify2FACode(twoFaCodeInput);
-      if (!success) {
-        setTwoFaError('Código 2FA incorreto ou expirado.');
-      }
-    } catch (err: any) {
-      setTwoFaError(err.message || 'Erro ao validar código 2FA.');
-    } finally {
-      setTwoFaLoading(false);
     }
   };
 
@@ -248,6 +165,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setErrorMessage('Não foi possível auto-adequar as imagens automaticamente.');
     } finally {
       setIsAutoAdequating(false);
+    }
+  };
+
+  // Ferramenta temporária de migração: puxa o conteúdo que ainda está salvo
+  // no Firestore (sistema antigo) e grava no Supabase através do mesmo
+  // caminho de salvamento já usado pelo painel. Pode ser removida depois
+  // que a migração for confirmada.
+  const [isMigrating, setIsMigrating] = useState(false);
+  const handleMigrateFromFirestore = async () => {
+    if (!confirm('Isso vai importar o conteúdo salvo no Firestore (sistema antigo) e SOBRESCREVER os dados atuais do Supabase. Confirmar?')) {
+      return;
+    }
+    setIsMigrating(true);
+    setErrorMessage(null);
+    try {
+      const [{ doc, getDoc }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('../lib/firebase'),
+      ]);
+      const snap = await getDoc(doc(db, 'content', 'mediaKit'));
+      if (!snap.exists()) {
+        alert('Nenhum dado encontrado no Firestore para importar.');
+        return;
+      }
+      const legacyData = snap.data() as MediaKitData;
+      const success = await onSave(legacyData);
+      alert(success ? 'Dados importados do Firestore e salvos no Supabase com sucesso!' : 'Falha ao salvar os dados importados no Supabase.');
+    } catch (err: any) {
+      console.error('Erro ao importar do Firestore:', err);
+      alert('Erro ao importar do Firestore: ' + (err?.message || err));
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -374,6 +323,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {user && (
               <button
                 type="button"
+                onClick={handleMigrateFromFirestore}
+                disabled={isMigrating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#4A2E1F] bg-white hover:bg-[#FAF7F2] border border-[#D4AF37]/50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                title="Importar dados antigos salvos no Firestore para o Supabase (usar uma única vez na migração)"
+              >
+                <Cloud className="w-3.5 h-3.5 text-[#B8860B]" />
+                <span>{isMigrating ? 'Importando...' : 'Importar do Firestore'}</span>
+              </button>
+            )}
+
+            {user && (
+              <button
+                type="button"
                 onClick={logout}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#7B4B2A] hover:text-[#C53030] bg-white sm:bg-transparent hover:bg-red-50 sm:hover:bg-white/60 border border-[#7B4B2A]/15 sm:border-transparent rounded-xl transition-colors cursor-pointer"
                 title="Desconectar"
@@ -395,105 +357,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
 
-        {/* If user is NOT logged in: Show Login Screen or 2FA Challenge */}
+        {/* If user is NOT logged in: Show Login Screen */}
         {!user ? (
           <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-            {twoFaChallenge.isPending ? (
-              /* 2FA Verification Card (Ative 2FA) */
-              <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-[#D4AF37]/50 shadow-xl space-y-6 animate-fadeIn">
-                <div className="text-center space-y-2">
-                  <h3 className="font-serif text-2xl text-[#2C1810]">
-                    Autenticação em 2 Fatores
-                  </h3>
-                  <p className="text-xs text-[#7B4B2A] leading-relaxed">
-                    Um código numérico seguro de 6 dígitos foi enviado para o e-mail cadastrado de <strong>{twoFaChallenge.maskedEmail || twoFaChallenge.email || 'sophiaamenezes10@gmail.com'}</strong>.
-                  </p>
-                </div>
-
-                {twoFaError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{twoFaError}</span>
-                  </div>
-                )}
-
-                {/* Email Delivery Notice */}
-                <div className="p-4 bg-gradient-to-br from-[#FAF7F2] to-[#F5EFE9] border border-[#D4AF37]/40 rounded-2xl text-center space-y-2.5">
-                  <div>
-                    <span className="text-xs font-semibold text-[#2C1810] block">
-                      Código enviado para seu e-mail
-                    </span>
-                    <span className="font-mono text-xs font-bold text-[#7B4B2A] block mt-0.5">
-                      {twoFaChallenge.maskedEmail || twoFaChallenge.email || 'sophiaamenezes10@gmail.com'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#7B4B2A]/90 leading-relaxed">
-                    Verifique sua caixa de entrada e spam. Válido por 5 minutos.
-                  </p>
-
-                  <div className="pt-2 border-t border-[#7B4B2A]/10">
-                    <button
-                      type="button"
-                      onClick={handleResend2FA}
-                      disabled={resendCooldown > 0}
-                      className="text-[11px] text-[#B8860B] hover:text-[#7B4B2A] font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RotateCcw className={`w-3 h-3 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
-                      {resendCooldown > 0
-                        ? `Aguarde ${resendCooldown}s para reenviar`
-                        : 'Não recebeu? Reenviar novo código'}
-                    </button>
-                  </div>
-                  {resendMessage && (
-                    <p className="text-[10px] text-emerald-700 mt-1 font-medium">{resendMessage}</p>
-                  )}
-                </div>
-
-                <form onSubmit={handle2FASubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#7B4B2A] mb-1.5 text-center">
-                      Digite o código de 6 dígitos
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      autoFocus
-                      value={twoFaCodeInput}
-                      onChange={(e) => setTwoFaCodeInput(e.target.value.replace(/\D/g, ''))}
-                      placeholder="123456"
-                      className="w-full text-center text-xl tracking-[0.4em] font-mono py-3 px-4 bg-[#FAF7F2] border border-[#D4AF37]/60 rounded-xl focus:border-[#B8860B] focus:ring-1 focus:ring-[#B8860B] focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={twoFaLoading || twoFaCodeInput.length < 6}
-                    className="w-full py-3.5 bg-[#4A2E1F] hover:bg-[#2C1810] text-[#FAF7F2] rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {twoFaLoading ? (
-                      <span className="flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin" /> Verificando 2FA...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-[#D4AF37]" /> Confirmar e Entrar
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={cancel2FA}
-                    disabled={twoFaLoading}
-                    className="w-full py-2 text-xs text-[#7B4B2A] hover:text-[#2C1810] transition-colors text-center cursor-pointer"
-                  >
-                    Voltar e alterar credenciais
-                  </button>
-                </form>
-              </div>
-            ) : (
-              /* Standard Login Screen with Rate Limit + Password Hash validation */
+            {
+              /* Standard Login Screen — senha validada pelo Supabase Auth no servidor */
               <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-[#D4AF37]/30 shadow-md space-y-6">
                 <div className="text-center space-y-2">
                   <span className="text-xs uppercase tracking-widest text-[#B8860B] font-semibold">
@@ -583,18 +451,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span>Entrar com Conta Google</span>
                 </button>
 
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsRegisterMode(!isRegisterMode)}
-                    className="text-xs text-[#B8860B] hover:underline cursor-pointer"
-                  >
-                    {isRegisterMode
-                      ? 'Já tem conta? Fazer login'
-                      : 'Primeiro acesso? Cadastre seu e-mail de admin'}
-                  </button>
-                </div>
-
                 {onClose && (
                   <div className="pt-2 text-center border-t border-[#7B4B2A]/10">
                     <button
@@ -608,7 +464,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 )}
               </div>
-            )}
+            }
           </div>
         ) : (
           /* Logged In: Full CMS Admin Interface */

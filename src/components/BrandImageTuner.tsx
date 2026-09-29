@@ -86,16 +86,21 @@ export const BrandImageTuner: React.FC<BrandImageTunerProps> = ({ brand, onUpdat
   // Super-Resolution Enhancer: Upscales and sharpens using high-precision bicubic filter on canvas
   const handleEnhanceResolution = async () => {
     if (!brand.logoUrl) return;
+    if (!brand.logoUrl.startsWith('data:')) {
+      setEnhancementSuccess('Esta imagem já está hospedada em alta resolução — envie um novo arquivo para trocá-la.');
+      setTimeout(() => setEnhancementSuccess(null), 4000);
+      return;
+    }
     setIsProcessing(true);
     setEnhancementSuccess(null);
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const targetDim = resolutionProfile === '1600p' ? 1400 : resolutionProfile === '800p' ? 800 : 1080;
+      const targetDim = resolutionProfile === '1600p' ? 1800 : resolutionProfile === '800p' ? 800 : 1200;
       const res = await autoOptimizeDataUrl(brand.logoUrl, {
         maxDimension: targetDim,
-        targetMaxKb: 90,
-        preferredQuality: 0.88,
+        targetMaxKb: 220,
+        preferredQuality: 0.9,
       });
 
       onUpdate({
